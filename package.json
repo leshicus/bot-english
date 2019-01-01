@@ -1,0 +1,14 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "leshicus",
+  "license": "MIT",
+  "scripts": {
+    "start": "ENV_PATH=.env nodemon --inspect=0.0.0.0:5858 ."
+  },
+  "dependencies": {
+    "node-telegram-bot-api": "^0.30.0"
+  },
+  "devDependencies": {}
+}
