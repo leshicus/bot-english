@@ -5,10 +5,12 @@
   "author": "leshicus",
   "license": "MIT",
   "scripts": {
-    "start": "ENV_PATH=.env nodemon --inspect=0.0.0.0:5858 ."
+    "start": "nodemon --inspect=0.0.0.0:5858 ."
   },
   "dependencies": {
-    "node-telegram-bot-api": "^0.30.0"
+    "dotenv": "^6.2.0",
+    "node-telegram-bot-api": "^0.30.0",
+    "path": "^0.12.7"
   },
   "devDependencies": {}
 }
