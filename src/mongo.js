@@ -1,8 +1,9 @@
 import { MongoClient, ObjectId } from 'mongodb';
 
-const PASSWORD = '742298';
+const PASSWORD = process.env.MONGODB_PASSWORD;
+const MONGODB_HOST = process.env.MONGODB_HOST;
 const DB = 'bot';
-const MONGO_URL = `mongodb+srv://alex:${PASSWORD}@leshicus-wulj0.mongodb.net/${DB}?retryWrites=true`;
+const MONGO_URL = `mongodb+srv://alex:${PASSWORD}@${MONGODB_HOST}/${DB}?retryWrites=true`;
 
 const COLLECTION_LESSONS = 'lessons';
 

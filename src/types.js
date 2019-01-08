@@ -9,17 +9,17 @@ type From = {
 };
 
 type Chat = {
-  id: 456709166,
-  first_name: 'Alex',
-  username: 'leshicus',
-  type: 'private',
+  id: number,
+  first_name: string,
+  username: string,
+  type: string,
 };
 
 export type Query = {
   id: string,
   from: From,
   message: {
-    message_id: 637,
+    message_id: number,
     from: From,
     chat: Chat,
     date: number,
