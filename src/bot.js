@@ -1,10 +1,11 @@
 // @flow
 import TelegramBot from 'node-telegram-bot-api';
 import textBlocks from './test/text-blocks.json';
-const lessonsObj = {
-  '1': require('./test/1.json'),
-  '2': require('./test/2.json'),
-};
+// const lessonsObj = {
+//   '1': require('./test/1.json'),
+//   '2': require('./test/2.json'),
+// };
+import { Mongo } from './mongo';
 import lessons from './test/lessons.json';
 import { log, shuffle } from './utils';
 import type { Query, Message } from './types';
@@ -20,10 +21,25 @@ const ANS = '<b>ОТВ</b>: ';
 export class Bot {
   bot: TelegramBot;
   users: Users;
+  mongo: Mongo;
+  lessons: Object;
 
   constructor(token: string) {
     this.bot = new TelegramBot(token, { polling: true });
     this.users = {};
+
+    this.mongo = new Mongo();
+
+    (async () => {
+      try {
+        this.lessons = await this.mongo.getLessons();
+        console.log('Загружено: ', this.lessons ? this.lessons.length : 0);
+      } catch (e) {
+        console.log('error 38:', e);
+      }
+    })();
+
+    // console.log('this.mongo', this.mongo.lessons.findOne({ id: 1 }));
   }
 
   onStart = (msg: Message, match: Array<string>) => {
@@ -38,7 +54,17 @@ export class Bot {
       `Привет, ${first_name}!\nЭто бот для тренировки английских предложений. Вот доступные темы: `,
     );
 
-    this.showContents(id);
+    if (this.lessons && this.lessons.length) {
+      this.showContents(id);
+    } else {
+      this.bot.sendMessage(id, `База с уроками не загружена. Загружаю...`);
+
+      (async () => {
+        this.lessons = await this.mongo.getLessons();
+        console.log('Загружено: ', this.lessons.length);
+        this.bot.sendMessage(id, `Загружено: ${this.lessons.length} уроков.`);
+      })();
+    }
   };
 
   registerUser(msg: Message) {
@@ -78,6 +104,8 @@ export class Bot {
   onStartLesson = (msg: Message, match: Array<string>) => {
     console.log('onStartLesson', msg, match);
 
+    // if (this.mongo) console.log('this.mongo.lessons', this.mongo.lessons);
+
     const { chat: { id: chatId } } = msg;
     const lessonId = +match[0].slice(1);
 
@@ -88,16 +116,19 @@ export class Bot {
     this.showSentences(chatId, 0, lessonId);
   };
 
-  showSentences(chatId: number, sentenceId: number, lessonId?: number) {
+  async showSentences(chatId: number, sentenceId: number, lessonId?: number) {
     console.log('showSentences', sentenceId, lessonId);
 
     let user = this.users[String(chatId)];
     let sentences;
 
+    const allLessons = this.lessons;
+    console.log('allLessons', allLessons);
+
     if (lessonId) {
-      sentences = lessonsObj[lessonId];
+      sentences = allLessons[lessonId];
     } else if (user.lesson.id != undefined) {
-      sentences = lessonsObj[String(user.lesson.id)];
+      sentences = allLessons[String(user.lesson.id)];
     }
 
     if (sentences) {
