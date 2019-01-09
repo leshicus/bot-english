@@ -5,8 +5,8 @@
   "author": "leshicus",
   "license": "MIT",
   "scripts": {
-    "start": "nodemon --exec npx babel-node -- .",
-    "babel-node": "babel-node --presets=/*a*/ --ignore='foo|bar|baz'"
+    "start": "nodemon --exec npx babel-node -- index.js",
+    "babel-node": "babel-node"
   },
   "dependencies": {
     "dotenv": "^6.2.0",
