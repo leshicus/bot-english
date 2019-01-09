@@ -1,12 +1,12 @@
 // @flow
 import TelegramBot from 'node-telegram-bot-api';
-import textBlocks from './test/text-blocks.json';
+// import textBlocks from './test/text-blocks.json';
 // const lessonsObj = {
 //   '1': require('./test/1.json'),
 //   '2': require('./test/2.json'),
 // };
 import { Mongo } from './mongo';
-import lessons from './test/lessons.json';
+import lessons from './lessons.json';
 import { log, shuffle } from './utils';
 import type { Query, Message } from './types';
 import { User, type Users } from './user';
