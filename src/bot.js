@@ -6,7 +6,7 @@ import TelegramBot from 'node-telegram-bot-api';
 //   '2': require('./test/2.json'),
 // };
 import { Mongo } from './mongo';
-import lessons from './lessons.json';
+const lessons = require('./lessons.json');
 import { log, shuffle } from './utils';
 import type { Query, Message } from './types';
 import { User, type Users } from './user';
