@@ -5,8 +5,12 @@ config();
 const token = process.env.TELEGRAM_TOKEN;
 
 if (token) {
-  const bot = new Bot(token);
-  bot.run();
+  try {
+    const bot = new Bot(token);
+    bot.run();
+  } catch (e) {
+    console.log(e);
+  }
 } else {
   console.log('Telegram Bot Token not provided');
   process.exit(1);

@@ -1,9 +1,10 @@
 import { MongoClient, ObjectId } from 'mongodb';
+import { config } from 'dotenv';
+config();
 
 const MONGODB_PASSWORD = process.env.MONGODB_PASSWORD;
 const MONGODB_HOST = process.env.MONGODB_HOST;
 const DB = 'bot';
-const MONGO_URL = `mongodb+srv://alex:${PASSWORD}@${MONGODB_HOST}/${DB}?retryWrites=true`;
 
 const COLLECTION_LESSONS = 'lessons';
 
@@ -16,6 +17,8 @@ if (!MONGODB_PASSWORD) {
   console.log('MONGODB_PASSWORD not provided');
   process.exit(1);
 }
+
+const MONGO_URL = `mongodb+srv://alex:${MONGODB_PASSWORD}@${MONGODB_HOST}/${DB}?retryWrites=true`;
 
 export class Mongo {
   // constructor() {
