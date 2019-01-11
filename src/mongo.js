@@ -60,7 +60,7 @@ export class Mongo {
     try {
       const client = await this.getClient();
       if (client) {
-        const connector = await client.db().collection(COLLECTION_LESSONS);
+        const connector = await client.db().collection(collectionName);
         const collection = await connector.find({}).toArray();
         client.close();
 
