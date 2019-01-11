@@ -139,40 +139,61 @@ export class Bot {
 
     if (!user) user = this.registerUser(msg);
 
-    this.showSentences(chatId, 0, lessonNum);
+    this.showSentences(chatId, 0, lessonNum - 1);
   };
 
-  showSentences(chatId: number, sentenceId: number, lessonNum?: number) {
-    log('showSentences. sentenceId=', sentenceId, 'lessonNum=', lessonNum);
+  showSentences(chatId: number, sentenceNum: number, lessonNum?: number) {
+    log('showSentences. sentenceNum=', sentenceNum, 'lessonNum=', lessonNum);
+
+    let user = this.users[String(chatId)];
+    let lessonId;
+    let sentenceId = sentenceNum + 1;
+
+    if (lessonNum === undefined) {
+      lessonId = user.lesson.id;
+      lessonNum = user.lesson.id - 1;
+    } else {
+      lessonId = lessonNum + 1;
+    }
 
     if (!this.mongo.lessons || !this.mongo.lessons.length) {
       log('Не загружены уроки');
       return;
     }
 
-    if (lessonNum !== undefined && lessonNum > this.mongo.lessons.length - 1) {
+    if (lessonNum > this.mongo.lessons.length) {
       log(
         `Номер урока ${lessonNum} больше допустимого значения: ${this.mongo
-          .lessons.length - 1}`,
+          .lessons.length}`,
       );
       return;
     }
 
-    let user = this.users[String(chatId)];
     let sentences;
+    sentences = this.mongo.lessons[lessonNum];
 
-    if (lessonNum !== undefined) {
-      sentences = this.mongo.lessons[lessonNum - 1];
-    } else if (user.lesson.id != undefined) {
-      sentences = this.mongo.lessons[user.lesson.id];
+    // * закончились предложения в уроке - перейжем на след. урок
+    if (sentenceNum > sentences.length - 1) {
+      // * закончились уроки - начнем сначала
+      if (lessonNum >= this.mongo.lessons.length - 1) {
+        lessonNum = 0;
+        lessonId = 1;
+      } else {
+        lessonNum++;
+        lessonId++;
+      }
+
+      sentenceNum = 0;
+      sentenceId = 1;
+      sentences = this.mongo.lessons[lessonNum];
     }
 
-    if (sentences && sentences[sentenceId]) {
-      const rus = sentences[sentenceId].rus;
-      const eng = sentences[sentenceId].eng;
+    if (sentences && sentences[sentenceNum]) {
+      const rus = sentences[sentenceNum].rus;
+      const eng = sentences[sentenceNum].eng;
 
       this.users[String(chatId)].lesson = {
-        id: lessonNum ? lessonNum + 1 : user.lesson.id,
+        id: lessonId,
         sentenceId: sentenceId,
         rus: processRussianSentence(rus),
         eng: eng.replace(/\./g, '').split(' '),
@@ -283,7 +304,7 @@ export class Bot {
   }
 
   onCallbackQuery = (query: Query) => {
-    log('onCallbackQuery', query);
+    log('onCallbackQuery');
 
     const {
       message: { chat: { id: chatId }, message_id, text } = {},
@@ -294,7 +315,8 @@ export class Bot {
     const { i: idxToRemove, w: word } = JSON.parse(data);
 
     if (word === CONTINUE) {
-      this.showSentences(chatId, user.lesson.sentenceId + 1);
+      const sentenceNum = user.lesson.sentenceId - 1;
+      this.showSentences(chatId, sentenceNum + 1);
     } else if (word === DELETE) {
       this.removeLastWord(chatId);
 
@@ -359,7 +381,7 @@ export class Bot {
   };
 
   onMessage = (msg: Message) => {
-    log('onMessage', msg);
+    log('onMessage');
   };
 
   run() {

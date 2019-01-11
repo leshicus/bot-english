@@ -5,8 +5,8 @@ export class User {
   first_name: string;
   language_code: string;
   lesson: Lesson = {
-    id: null,
-    sentenceId: null,
+    id: 1,
+    sentenceId: 1,
     rus: [],
     eng: [],
     engText: [],
@@ -51,8 +51,8 @@ export type Users = {
 };
 
 export type Lesson = {
-  id: ?number,
-  sentenceId: ?number,
+  id: number,
+  sentenceId: number,
   rus: Array<string>,
   eng: Array<string>,
   engText: Array<string>,
