@@ -40,7 +40,7 @@ export class Bot {
       log('Длина сообщения превышает максимально допустимую: ', TG_MAX_LENGTH);
     }
 
-    return this.sendMessage(id, msg.substr(0, TG_MAX_LENGTH), options);
+    this.bot.sendMessage(id, msg.substr(0, TG_MAX_LENGTH), options);
   }
 
   onStart = (msg: Message, match: Array<string>) => {
@@ -91,7 +91,7 @@ export class Bot {
   registerUser(msg: Message) {
     log('registerUser');
 
-    const { chat: { id }, from: { first_name, username, language_code } } = msg;
+    const { from: { id, first_name, username, language_code } } = msg;
 
     if (this.users[id]) {
       return this.users[id];
