@@ -2,7 +2,13 @@
 
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
-import { log, shuffle, processRussianSentence, markupText } from './utils';
+import {
+  log,
+  logMsg,
+  shuffle,
+  processRussianSentence,
+  markupText,
+} from './utils';
 import type { Query, Message } from './types';
 import { User, type Users } from './user';
 
@@ -21,7 +27,7 @@ export class Bot {
   lessonsList: Array<Object>;
 
   constructor(token: string) {
-    this.bot = new TelegramBot(token, { polling: false });
+    this.bot = new TelegramBot(token, { polling: true });
 
     this.users = {};
 

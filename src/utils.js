@@ -2,13 +2,12 @@ import { config } from 'dotenv';
 config();
 
 export const log = (...args) => {
-  if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
-    console.log.apply(null, args);
-  }
+  // if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
+  console.log.apply(null, args);
+  // }
 };
 
-/*
-export const log = msg => {
+export const logMsg = msg => {
   //  msg:
   //  { message_id: 31,
   //   from:
@@ -59,7 +58,7 @@ export const log = msg => {
     console.log('reply_to_message:');
     log(reply_to_message);
   }
-};*/
+};
 
 export const shuffle = a => {
   for (let i = a.length - 1; i > 0; i--) {

@@ -1,7 +1,7 @@
 // @flow
 import { Bot } from './src/bot';
 
-process.env.NTBA_FIX_319 = 1;
+process.env.NTBA_FIX_319 = '1';
 
 const token = process.env.TELEGRAM_TOKEN;
 
