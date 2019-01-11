@@ -40,7 +40,7 @@ export class Mongo {
       const lessonsList = await this.loadLessonsList();
       log('Загружено тем уроков: ', lessonsList ? lessonsList.length : 0);
     } catch (error) {
-      console.log(error);
+      log(error);
     }
   };
 
@@ -50,11 +50,13 @@ export class Mongo {
         useNewUrlParser: true,
       });
     } catch (error) {
-      console.log(error);
+      log(error);
     }
   }
 
   async getCollection(collectionName: string) {
+    log('getCollection', collectionName);
+
     try {
       const client = await this.getClient();
       if (client) {
@@ -67,14 +69,16 @@ export class Mongo {
         return Promise.resolve([]);
       }
     } catch (error) {
-      console.log(error);
+      log(error);
       return Promise.resolve([]);
     }
   }
 
   async loadLessons() {
+    log('loadLessons');
+
     try {
-      if (process.env.NODE_ENV === 'development' && !process.env.DEBUG) {
+      if (process.env.NODE_ENV === 'development') {
         this.lessons = [
           require('./test/1.json'),
           require('./test/2.json'),
@@ -84,13 +88,17 @@ export class Mongo {
         this.lessons = await this.getCollection(COLLECTION_LESSONS);
       }
     } catch (error) {
-      console.log(error);
+      log(error);
     }
+
+    log('lessons length', this.lessons.length);
 
     return this.lessons;
   }
 
   async loadLessonsList() {
+    log('loadLessonsList');
+
     try {
       if (process.env.NODE_ENV === 'development') {
         this.lessonsList = require('./test/lessonsList.json');
@@ -98,8 +106,10 @@ export class Mongo {
         this.lessonsList = await this.getCollection(COLLECTION_LESSONS_LIST);
       }
     } catch (error) {
-      console.log(error);
+      log(error);
     }
+
+    log('lessonsList length', this.lessonsList.length);
 
     return this.lessonsList;
   }

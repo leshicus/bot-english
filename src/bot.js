@@ -18,6 +18,7 @@ const DELETE = 'Удалить';
 const EN = '<b>АНГ</b>: ';
 const RU = '<b>РУС</b>: ';
 const ANS = '<b>ОТВ</b>: ';
+const TG_MAX_LENGTH = 4096; // telegram msg max length
 
 export class Bot {
   bot: TelegramBot;
@@ -34,6 +35,14 @@ export class Bot {
     this.mongo = new Mongo();
   }
 
+  sendMessage(id: number, msg: string, options?: Object) {
+    if (msg.length > TG_MAX_LENGTH) {
+      log('Длина сообщения превышает максимально допустимую: ', TG_MAX_LENGTH);
+    }
+
+    return this.sendMessage(id, msg.substr(0, TG_MAX_LENGTH), options);
+  }
+
   onStart = (msg: Message, match: Array<string>) => {
     log('onStart');
 
@@ -41,7 +50,7 @@ export class Bot {
 
     this.registerUser(msg);
 
-    this.bot.sendMessage(
+    this.sendMessage(
       id,
       `Привет, ${first_name}!\nЭто бот для тренировки английских предложений. Вот доступные темы: `,
     );
@@ -54,15 +63,15 @@ export class Bot {
     ) {
       this.showContents(id);
     } else {
-      this.bot.sendMessage(id, `База с уроками не загружена. Загружаю...`);
+      this.sendMessage(id, `База с уроками не загружена. Загружаю...`);
 
       (async () => {
         try {
           const lessons = await this.mongo.loadLessons();
           const lessonsList = await this.mongo.loadLessonsList();
 
-          this.bot.sendMessage(id, `Загружено: ${lessonsList.length} тем.`);
-          this.bot.sendMessage(id, `Загружено: ${lessons.length} уроков.`);
+          this.sendMessage(id, `Загружено: ${lessonsList.length} тем.`);
+          this.sendMessage(id, `Загружено: ${lessons.length} уроков.`);
 
           if (
             this.mongo.lessons &&
@@ -114,9 +123,9 @@ export class Bot {
           return acc;
         }, '');
 
-      this.bot.sendMessage(chatId, topics, { parse_mode: 'HTML' });
+      this.sendMessage(chatId, topics, { parse_mode: 'HTML' });
     } else {
-      this.bot.sendMessage(chatId, 'Темы не загружены', { parse_mode: 'HTML' });
+      this.sendMessage(chatId, 'Темы не загружены', { parse_mode: 'HTML' });
     }
   }
 
@@ -182,7 +191,7 @@ export class Bot {
 
     const inline_keyboard = this.makeAnswerKeyboard(chatId);
 
-    this.bot.sendMessage(
+    this.sendMessage(
       chatId,
       markupText(`${RU}` + user.getRusString() + `\n${EN}`),
       {
