@@ -1,4 +1,5 @@
 // @flow
+
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
 import { log, shuffle, processRussianSentence, markupText } from './utils';
@@ -20,7 +21,7 @@ export class Bot {
   lessonsList: Array<Object>;
 
   constructor(token: string) {
-    this.bot = new TelegramBot(token, { polling: true });
+    this.bot = new TelegramBot(token, { polling: false });
 
     this.users = {};
 

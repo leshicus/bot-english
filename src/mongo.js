@@ -3,9 +3,6 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { promisify } from 'util';
 import fs from 'fs';
 import { log } from './utils';
-import { config } from 'dotenv';
-
-config();
 
 const readFile = promisify(fs.readFile);
 
@@ -77,7 +74,7 @@ export class Mongo {
 
   async loadLessons() {
     try {
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === 'development' && !process.env.DEBUG) {
         this.lessons = [
           require('./test/1.json'),
           require('./test/2.json'),

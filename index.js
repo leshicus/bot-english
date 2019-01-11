@@ -1,7 +1,8 @@
 // @flow
-import { config } from 'dotenv';
 import { Bot } from './src/bot';
-config();
+
+process.env.NTBA_FIX_319 = 1;
+
 const token = process.env.TELEGRAM_TOKEN;
 
 if (token) {

@@ -2,8 +2,8 @@ import { config } from 'dotenv';
 config();
 
 export const log = (...args) => {
-  if (process.env.NODE_ENV === 'development') {
-    console.log.call(null, args);
+  if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
+    console.log.apply(null, args);
   }
 };
 
