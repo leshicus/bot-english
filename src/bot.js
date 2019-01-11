@@ -50,19 +50,23 @@ export class Bot {
       this.bot.sendMessage(id, `База с уроками не загружена. Загружаю...`);
 
       (async () => {
-        const lessons = await this.mongo.loadLessons();
-        const lessonsList = await this.mongo.loadLessonsList();
+        try {
+          const lessons = await this.mongo.loadLessons();
+          const lessonsList = await this.mongo.loadLessonsList();
 
-        this.bot.sendMessage(id, `Загружено: ${lessonsList.length} тем.`);
-        this.bot.sendMessage(id, `Загружено: ${lessons.length} уроков.`);
+          this.bot.sendMessage(id, `Загружено: ${lessonsList.length} тем.`);
+          this.bot.sendMessage(id, `Загружено: ${lessons.length} уроков.`);
 
-        if (
-          this.mongo.lessons &&
-          this.mongo.lessons.length &&
-          this.mongo.lessonsList &&
-          this.mongo.lessonsList.length
-        ) {
-          this.showContents(id);
+          if (
+            this.mongo.lessons &&
+            this.mongo.lessons.length &&
+            this.mongo.lessonsList &&
+            this.mongo.lessonsList.length
+          ) {
+            this.showContents(id);
+          }
+        } catch (error) {
+          console.log(error);
         }
       })();
     }
@@ -115,7 +119,7 @@ export class Bot {
     this.showSentences(chatId, 0, lessonNum);
   };
 
-  async showSentences(chatId: number, sentenceId: number, lessonNum?: number) {
+  showSentences(chatId: number, sentenceId: number, lessonNum?: number) {
     log('showSentences. sentenceId=', sentenceId, 'lessonNum=', lessonNum);
 
     if (!this.mongo.lessons || !this.mongo.lessons.length) {

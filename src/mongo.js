@@ -36,58 +36,72 @@ export class Mongo {
   }
 
   loadData = async () => {
-    const lessons = await this.loadLessons();
-    log('Загружено уроков: ', lessons ? lessons.length : 0);
+    try {
+      const lessons = await this.loadLessons();
+      log('Загружено уроков: ', lessons ? lessons.length : 0);
 
-    const lessonsList = await this.loadLessonsList();
-    log('Загружено тем уроков: ', lessonsList ? lessonsList.length : 0);
+      const lessonsList = await this.loadLessonsList();
+      log('Загружено тем уроков: ', lessonsList ? lessonsList.length : 0);
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   async getClient() {
-    return MongoClient.connect(MONGO_URL, {
-      useNewUrlParser: true,
-    });
+    try {
+      return MongoClient.connect(MONGO_URL, {
+        useNewUrlParser: true,
+      });
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async getCollection(collectionName: string) {
-    const client = await this.getClient();
-    const connector = await client.db().collection(COLLECTION_LESSONS);
-    const collection = connector.find({}).toArray();
-    client.close();
+    try {
+      const client = await this.getClient();
+      if (client) {
+        const connector = await client.db().collection(COLLECTION_LESSONS);
+        const collection = await connector.find({}).toArray();
+        client.close();
 
-    return collection;
+        return await collection;
+      } else {
+        return Promise.resolve([]);
+      }
+    } catch (error) {
+      console.log(error);
+      return Promise.resolve([]);
+    }
   }
 
   async loadLessons() {
-    if (process.env.NODE_ENV === 'development') {
-      // try {
-      //   for (let i = 1; i <= 3; i++) {
-      //     const les = await readFile(`./src/test/${i}.json`);
-      //     // console.log(this.lessons);
-      //     this.lessons.push(les);
-      //     log('Загружен урок: ', i);
-      //   }
-      // } catch (e) {
-      //   console.log(e);
-      // }
-
-      this.lessons = [
-        require('./test/1.json'),
-        require('./test/2.json'),
-        require('./test/3.json'),
-      ];
-    } else {
-      this.lessons = await this.getCollection(COLLECTION_LESSONS);
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        this.lessons = [
+          require('./test/1.json'),
+          require('./test/2.json'),
+          require('./test/3.json'),
+        ];
+      } else {
+        this.lessons = await this.getCollection(COLLECTION_LESSONS);
+      }
+    } catch (error) {
+      console.log(error);
     }
 
     return this.lessons;
   }
 
   async loadLessonsList() {
-    if (process.env.NODE_ENV === 'development') {
-      this.lessonsList = require('./test/lessonsList.json');
-    } else {
-      this.lessonsList = await this.getCollection(COLLECTION_LESSONS_LIST);
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        this.lessonsList = require('./test/lessonsList.json');
+      } else {
+        this.lessonsList = await this.getCollection(COLLECTION_LESSONS_LIST);
+      }
+    } catch (error) {
+      console.log(error);
     }
 
     return this.lessonsList;
