@@ -91,20 +91,27 @@ export class Bot {
   showContents(chatId: number) {
     log('showContents');
 
-    const topics =
-      `<b>Темы</b>` +
-      this.mongo.lessonsList.reduce((acc, topic) => {
-        acc += `\n<b>${topic.title}</b>\n`;
-        acc += topic.lessons.reduce((ac, lesson) => {
-          ac += `/${lesson.id} ${lesson.title} \n`;
+    if (this.mongo.lessonsList && this.mongo.lessonsList.length) {
+      const topics =
+        `<b>Темы</b>` +
+        this.mongo.lessonsList.reduce((acc, topic) => {
+          acc += `\n<b>${topic.title}</b>\n`;
 
-          return ac;
+          if (topic.lessons && topic.lessons.length) {
+            acc += topic.lessons.reduce((ac, lesson) => {
+              ac += `/${lesson.id} ${lesson.title} \n`;
+
+              return ac;
+            }, '');
+          }
+
+          return acc;
         }, '');
 
-        return acc;
-      }, '');
-
-    this.bot.sendMessage(chatId, topics, { parse_mode: 'HTML' });
+      this.bot.sendMessage(chatId, topics, { parse_mode: 'HTML' });
+    } else {
+      this.bot.sendMessage(chatId, 'Темы не загружены', { parse_mode: 'HTML' });
+    }
   }
 
   onStartLesson = (msg: Message, match: Array<string>) => {
