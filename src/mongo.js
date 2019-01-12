@@ -91,8 +91,6 @@ export class Mongo {
       log(error);
     }
 
-    log('lessons length', this.lessons.length);
-
     return this.lessons;
   }
 
@@ -108,8 +106,6 @@ export class Mongo {
     } catch (error) {
       log(error);
     }
-
-    log('lessonsList length', this.lessonsList.length);
 
     return this.lessonsList;
   }

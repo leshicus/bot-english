@@ -130,7 +130,7 @@ export class Bot {
   }
 
   onStartLesson = (msg: Message, match: Array<string>) => {
-    log('onStartLesson', msg, match);
+    log('onStartLesson');
 
     const { chat: { id: chatId } } = msg;
     const lessonNum = +match[0].slice(1);
@@ -187,6 +187,8 @@ export class Bot {
       sentenceId = 1;
       sentences = this.mongo.lessons[lessonNum];
     }
+
+console.log('sent',sentenceNum, sentences[sentenceNum])
 
     if (sentences && sentences[sentenceNum]) {
       const rus = sentences[sentenceNum].rus;
