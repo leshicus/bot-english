@@ -1,5 +1,4 @@
 // @flow
-
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
 import {
@@ -11,6 +10,7 @@ import {
 } from './utils';
 import type { Query, Message } from './types';
 import { User, type Users } from './user';
+import { MSG_MAX_LEN } from './constants';
 
 const WORDS_IN_ROW = 3;
 const CONTINUE = 'Дальше';
@@ -37,7 +37,7 @@ export class Bot {
 
   sendMessage(id: number, msg: string, options?: Object) {
     if (msg.length > TG_MAX_LENGTH) {
-      log('Длина сообщения превышает максимально допустимую: ', TG_MAX_LENGTH);
+      log(MSG_MAX_LEN, TG_MAX_LENGTH);
     }
 
     this.bot.sendMessage(id, msg.substr(0, TG_MAX_LENGTH), options);
@@ -172,7 +172,7 @@ export class Bot {
     let sentences;
     sentences = this.mongo.lessons[lessonNum];
 
-    // * закончились предложения в уроке - перейжем на след. урок
+    // * закончились предложения в уроке - перейдем на след. урок
     if (sentenceNum > sentences.length - 1) {
       // * закончились уроки - начнем сначала
       if (lessonNum >= this.mongo.lessons.length - 1) {
@@ -187,8 +187,8 @@ export class Bot {
       sentenceId = 1;
       sentences = this.mongo.lessons[lessonNum];
     }
-
-console.log('sent',sentenceNum, sentences[sentenceNum])
+    log('lessonNum', lessonNum, sentences);
+    log('sent', sentenceNum, sentences[sentenceNum]);
 
     if (sentences && sentences[sentenceNum]) {
       const rus = sentences[sentenceNum].rus;
