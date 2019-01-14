@@ -7,7 +7,8 @@ export class User {
   lesson: Lesson = {
     id: 1,
     sentenceId: 1,
-    rus: [],
+    // rus: [],
+    rus: '',
     eng: [],
     engText: [],
     engButtons: [],
@@ -26,8 +27,14 @@ export class User {
   }
 
   getRusString() {
-    if (this.lesson.rus) return this.lesson.rus.join(' ');
-    else return '';
+    // if (this.lesson.rus) {
+    //   if (Array.isArray(this.lesson.rus)) {
+    //     return this.lesson.rus.join(' ');
+    //   } else {
+    //     this.lesson.rus;
+    //   }
+    // } else return '';
+    return this.lesson.rus || '';
   }
 
   getEngString() {
@@ -53,7 +60,8 @@ export type Users = {
 export type Lesson = {
   id: number,
   sentenceId: number,
-  rus: Array<string>,
+  rus: string,
+  // rus: Array<string>,
   eng: Array<string>,
   engText: Array<string>,
   engButtons: Array<string>,

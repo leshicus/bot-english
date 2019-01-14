@@ -10,6 +10,7 @@ import {
 } from './utils';
 import type { Query, Message } from './types';
 import { User, type Users } from './user';
+import { type Lesson } from './user';
 import { MSG_MAX_LEN } from './constants';
 
 const WORDS_IN_ROW = 3;
@@ -34,6 +35,14 @@ export class Bot {
 
     this.mongo = new Mongo();
   }
+
+  getLessons = () => {
+    return this.mongo.lessons;
+  };
+
+  getLessonsList = () => {
+    return this.mongo.lessonsList;
+  };
 
   sendMessage(id: number, msg: string, options?: Object) {
     if (msg.length > TG_MAX_LENGTH) {
@@ -133,97 +142,96 @@ export class Bot {
     log('onStartLesson');
 
     const { chat: { id: chatId } } = msg;
-    const lessonNum = +match[0].slice(1);
+    const lessonId = +match[0].slice(1);
 
     let user = this.users[chatId];
 
     if (!user) user = this.registerUser(msg);
 
-    this.showSentences(chatId, 0, lessonNum - 1);
+    this.showNextSentence(chatId, 0, lessonId);
   };
 
-  showSentences(chatId: number, sentenceNum: number, lessonNum?: number) {
-    log('showSentences. sentenceNum=', sentenceNum, 'lessonNum=', lessonNum);
+  getNumberOfSentencesInLesson(lessonId: number) {
+    return this.mongo.lessons.filter(lesson => lesson.lesson === lessonId);
+  }
 
-    let user = this.users[String(chatId)];
-    let lessonId;
-    let sentenceId = sentenceNum + 1;
-
-    if (lessonNum === undefined) {
-      lessonId = user.lesson.id;
-      lessonNum = user.lesson.id - 1;
-    } else {
-      lessonId = lessonNum + 1;
-    }
+  showNextSentence(chatId: number, sentenceNum: number, lessonId: number) {
+    log('showNextSentence. sentenceNum=', sentenceNum, 'lessonId=', lessonId);
 
     if (!this.mongo.lessons || !this.mongo.lessons.length) {
       log('Не загружены уроки');
       return;
     }
 
-    if (lessonNum > this.mongo.lessons.length) {
+    if (lessonId > this.mongo.lessons.length) {
       log(
-        `Номер урока ${lessonNum} больше допустимого значения: ${this.mongo
+        `Номер урока ${lessonId} больше допустимого значения: ${this.mongo
           .lessons.length}`,
       );
       return;
     }
 
-    let sentences;
-    sentences = this.mongo.lessons[lessonNum];
+    let sentencesInLesson = this.getNumberOfSentencesInLesson(lessonId);
 
     // * закончились предложения в уроке - перейдем на след. урок
-    if (sentenceNum > sentences.length - 1) {
+    if (sentenceNum > sentencesInLesson.length - 1) {
       // * закончились уроки - начнем сначала
-      if (lessonNum >= this.mongo.lessons.length - 1) {
-        lessonNum = 0;
+      if (lessonId >= this.mongo.getNumberOfLessons()) {
         lessonId = 1;
       } else {
-        lessonNum++;
         lessonId++;
       }
 
       sentenceNum = 0;
-      sentenceId = 1;
-      sentences = this.mongo.lessons[lessonNum];
+      sentencesInLesson = this.getNumberOfSentencesInLesson(lessonId);
     }
-    log('lessonNum', lessonNum, sentences);
-    log('sent', sentenceNum, sentences[sentenceNum]);
 
-    if (sentences && sentences[sentenceNum]) {
-      const rus = sentences[sentenceNum].rus;
-      const eng = sentences[sentenceNum].eng;
+    if (sentencesInLesson && sentencesInLesson[sentenceNum]) {
+      const rus = sentencesInLesson[sentenceNum].rus;
+      const eng = sentencesInLesson[sentenceNum].eng;
 
       this.users[String(chatId)].lesson = {
         id: lessonId,
-        sentenceId: sentenceId,
-        rus: processRussianSentence(rus),
+        sentenceId: sentenceNum + 1,
+        rus: rus,
+        // rus: processRussianSentence(rus),
         eng: eng.replace(/\./g, '').split(' '),
         engButtons: shuffle(eng.toLowerCase().replace(/\./g, '').split(' ')),
         engText: [],
       };
     }
 
-    this.showSentence(chatId);
+    this.showSentenceToUser(chatId, sentenceNum, sentencesInLesson);
   }
 
-  showSentence(chatId: number) {
-    log('showSentence');
+  formatPaging(sentenceNum: number, lessonId: number) {
+    const sentencesInLesson = this.getNumberOfSentencesInLesson(lessonId);
+    return `Тема: ${lessonId}, урок: ${sentenceNum +
+      1}/${sentencesInLesson.length}`;
+  }
+
+  showSentenceToUser(
+    chatId: number,
+    sentenceNum: number,
+    sentencesInLesson: Array<Lesson>,
+  ) {
+    log('showSentenceToUser');
 
     const user = this.users[String(chatId)];
 
     const inline_keyboard = this.makeAnswerKeyboard(chatId);
 
-    this.sendMessage(
-      chatId,
-      markupText(`${RU}` + user.getRusString() + `\n${EN}`),
-      {
-        reply_markup: {
-          inline_keyboard,
-        },
-        parse_mode: 'HTML',
-      },
+    const paging = this.formatPaging(sentenceNum, user.lesson.id);
+    const text = markupText(
+      `${paging}\n${RU}` + user.getRusString() + `\n${EN}`,
     );
+
+    this.sendMessage(chatId, text, {
+      reply_markup: {
+        inline_keyboard,
+      },
+      parse_mode: 'HTML',
+    });
   }
 
   removePressedButton(chatId: number, idxToRemove?: number) {
@@ -316,27 +324,36 @@ export class Bot {
 
     const { i: idxToRemove, w: word } = JSON.parse(data);
 
+    const lessonId = user.lesson.id;
+    const sentencesInLesson = this.getNumberOfSentencesInLesson(lessonId);
+    const paging = this.formatPaging(
+      user.lesson.sentenceId - 1,
+      user.lesson.id,
+    );
+
     if (word === CONTINUE) {
       const sentenceNum = user.lesson.sentenceId - 1;
-      this.showSentences(chatId, sentenceNum + 1);
+      this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
     } else if (word === DELETE) {
       this.removeLastWord(chatId);
 
       const answerKeyboard = this.makeAnswerKeyboard(chatId);
 
-      this.bot.editMessageText(
-        markupText(
-          `${RU}` + user.getRusString() + `\n${EN}` + user.getEngTextString(),
-        ),
-        {
-          message_id,
-          chat_id: chatId,
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: answerKeyboard,
-          },
-        },
+      const text = markupText(
+        `${paging}\n${RU}` +
+          user.getRusString() +
+          `\n${EN}` +
+          user.getEngTextString(),
       );
+
+      this.bot.editMessageText(text, {
+        message_id,
+        chat_id: chatId,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: answerKeyboard,
+        },
+      });
     } else {
       this.removePressedButton(chatId, idxToRemove);
 
@@ -345,39 +362,42 @@ export class Bot {
       if (engButtons && !engButtons.length) {
         // no buttons left, add 'continue'
         const answerKeyboard = this.makeAnswerKeyboard(chatId);
-        log(answerKeyboard);
-        this.bot.editMessageText(
+
+        const text =
           markupText(
-            `${RU}` + user.getRusString() + `\n${EN}` + user.getEngTextString(),
+            `${paging}\n${RU}` +
+              user.getRusString() +
+              `\n${EN}` +
+              user.getEngTextString(),
           ) +
-            `\n${ANS}` +
-            user.getEngString(),
-          {
-            message_id,
-            chat_id: chatId,
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: answerKeyboard,
-            },
+          `\n${ANS}` +
+          user.getEngString();
+        this.bot.editMessageText(text, {
+          message_id,
+          chat_id: chatId,
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: answerKeyboard,
           },
-        );
+        });
       } else {
         // buttons still exist
         const answerKeyboard = this.makeAnswerKeyboard(chatId);
 
-        this.bot.editMessageText(
-          markupText(
-            `${RU}` + user.getRusString() + `\n${EN}` + user.getEngTextString(),
-          ),
-          {
-            message_id,
-            chat_id: chatId,
-            parse_mode: 'HTML',
-            reply_markup: {
-              inline_keyboard: answerKeyboard,
-            },
-          },
+        const text = markupText(
+          `${paging}\n${RU}` +
+            user.getRusString() +
+            `\n${EN}` +
+            user.getEngTextString(),
         );
+        this.bot.editMessageText(text, {
+          message_id,
+          chat_id: chatId,
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: answerKeyboard,
+          },
+        });
       }
     }
   };

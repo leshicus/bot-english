@@ -1,5 +1,6 @@
 // @flow
 import { Bot } from './src/bot';
+import { runWebServer } from './src/koa';
 
 process.env.NTBA_FIX_319 = '1';
 
@@ -9,6 +10,8 @@ if (token) {
   try {
     const bot = new Bot(token);
     bot.run();
+
+    runWebServer(bot);
   } catch (e) {
     console.log(e);
   }

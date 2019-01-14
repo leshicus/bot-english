@@ -80,9 +80,9 @@ export class Mongo {
     try {
       if (process.env.NODE_ENV === 'development') {
         this.lessons = [
-          require('./test/1.json'),
-          require('./test/2.json'),
-          require('./test/3.json'),
+          ...require('./test/1.json'),
+          ...require('./test/2.json'),
+          ...require('./test/3.json'),
         ];
       } else {
         this.lessons = await this.getCollection(COLLECTION_LESSONS);
@@ -109,4 +109,16 @@ export class Mongo {
 
     return this.lessonsList;
   }
+
+  getNumberOfLessons = () => {
+    // return this.lessons[this.lessons.length - 1].lesson;
+
+    let prevIdx;
+    return this.lessons.reduce((acc, item) => {
+      if (!prevIdx || item.lesson !== prevIdx) {
+        prevIdx = item.lesson;
+        return Number(acc) + 1;
+      } else return acc;
+    }, 0);
+  };
 }
