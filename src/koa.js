@@ -18,6 +18,11 @@ export const runWebServer = (bot: any) => {
   const router = new Router();
 
   router
+    .get('/', async (ctx, next) => {
+      const lessons = await bot.getLessons();
+      const lessonsList = await bot.getLessonsList();
+      ctx.body = `Тем: ${lessonsList.length}, уроков: ${lessons.length}`;
+    })
     .get('/lessons', async (ctx, next) => {
       const lessons = await bot.getLessons();
       ctx.body = formatJson(makeResp(lessons));
