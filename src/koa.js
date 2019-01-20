@@ -2,7 +2,7 @@
 import Koa from 'koa';
 import Router from 'koa-router';
 
-const PORT = process.env.PORT || '8080';
+const PORT = process.env.PORT || '5000';
 
 const formatJson = json => JSON.stringify(json, null, 2);
 const makeResp = arr => {
@@ -26,6 +26,10 @@ export const runWebServer = (bot: any) => {
     .get('/lessons', async (ctx, next) => {
       const lessons = await bot.getLessons();
       ctx.body = formatJson(makeResp(lessons));
+    })
+    .get('/copyLessons', async (ctx, next) => {
+      const cnt = await bot.mongo.copyCollection('lessons');
+      ctx.body = cnt;
     })
     .get('/lessonsList', async (ctx, next) => {
       const lessonsList = await bot.getLessonsList();

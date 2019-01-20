@@ -69,22 +69,36 @@ export const shuffle = a => {
 };
 
 export const processRussianSentence = (str: string): Array<string> => {
+  const words = [];
+
   while (str.indexOf('[') !== -1) {
+    str = str.replace(/\!|\,|\.|[\\?]/g, '');
+
     const start = str.indexOf('[');
     const end = str.indexOf(']') + 1;
     const block = str.slice(start, end);
 
     const arrBlock = block.split('|');
-    const replacement =
-      arrBlock[0].slice(1) +
-      ' (' +
-      arrBlock[arrBlock.length - 1].slice(0, -1) +
-      ')';
+    const rusWord = arrBlock[0].slice(1);
+    const engWord = arrBlock[arrBlock.length - 1].slice(0, -1);
+    const replacement = rusWord;
+    words.push({ rus: rusWord, eng: engWord });
 
     str = str.replace(block, replacement);
   }
 
-  return str.replace(/\./g, '').split(' ');
+  return {
+    rus: str.replace(/\./g, ''),
+    words,
+  };
+};
+
+export const divideSentenceByDot = (str: string): Array<string> => {
+  const arr = str
+    .split('.')
+    .map(sent => sent.trim())
+    .filter(sent => sent !== '');
+  return arr;
 };
 
 export const markupText = (str: string) => {

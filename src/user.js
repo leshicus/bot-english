@@ -1,4 +1,6 @@
 //@flow
+import { type Word } from './types';
+
 export class User {
   id: number;
   username: string;
@@ -12,6 +14,7 @@ export class User {
     eng: [],
     engText: [],
     engButtons: [],
+    words: [],
   };
 
   constructor(
@@ -42,6 +45,14 @@ export class User {
     else return '';
   }
 
+  getWords() {
+    if (this.lesson.words && this.lesson.words.length) {
+      return this.lesson.words.reduce((acc, obj) => {
+        return '\n' + obj.rus + ' - ' + obj.eng;
+      }, '');
+    } else return '';
+  }
+
   getEngTextString() {
     if (this.lesson.engText) return this.lesson.engText.join(' ');
     else return '';
@@ -65,4 +76,5 @@ export type Lesson = {
   eng: Array<string>,
   engText: Array<string>,
   engButtons: Array<string>,
+  words: Array<Word>,
 };

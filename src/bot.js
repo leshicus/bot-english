@@ -21,6 +21,8 @@ const RU = '<b>РУС</b>: ';
 const ANS = '<b>ОТВ</b>: ';
 const TG_MAX_LENGTH = 4096; // telegram msg max length
 
+const DEBUG_MONGO = process.env.DEBUG_MONGO;
+
 export class Bot {
   bot: TelegramBot;
   users: Users;
@@ -29,20 +31,22 @@ export class Bot {
   lessonsList: Array<Object>;
 
   constructor(token: string) {
-    this.bot = new TelegramBot(token, { polling: true });
+    this.bot = new TelegramBot(token, { polling: !DEBUG_MONGO });
 
     this.users = {};
 
     this.mongo = new Mongo();
+
+    // this.mongo.copyCollection('lessons');
   }
 
-  getLessons = () => {
-    return this.mongo.lessons;
-  };
+  // getLessons = () => {
+  //   return this.mongo.lessons;
+  // };
 
-  getLessonsList = () => {
-    return this.mongo.lessonsList;
-  };
+  // getLessonsList = () => {
+  //   return this.mongo.lessonsList;
+  // };
 
   sendMessage(id: number, msg: string, options?: Object) {
     if (msg.length > TG_MAX_LENGTH) {
@@ -61,8 +65,14 @@ export class Bot {
 
     this.sendMessage(
       id,
-      `Привет, ${first_name}!\nЭто бот для тренировки английских предложений. Вот доступные темы: `,
+      `Привет, ${first_name}!\nЭто бот для тренировки английских предложений. Вот доступные темы: /contents`,
     );
+  };
+
+  onShowContents = (msg: Message, match: Array<string>) => {
+    log('onShowContents');
+
+    const { from: { id } } = msg;
 
     if (
       this.mongo.lessons &&
@@ -189,6 +199,7 @@ export class Bot {
     if (sentencesInLesson && sentencesInLesson[sentenceNum]) {
       const rus = sentencesInLesson[sentenceNum].rus;
       const eng = sentencesInLesson[sentenceNum].eng;
+      const words = sentencesInLesson[sentenceNum].words;
 
       this.users[String(chatId)].lesson = {
         id: lessonId,
@@ -198,6 +209,7 @@ export class Bot {
         eng: eng.replace(/\./g, '').split(' '),
         engButtons: shuffle(eng.toLowerCase().replace(/\./g, '').split(' ')),
         engText: [],
+        words: words,
       };
     }
 
@@ -223,7 +235,7 @@ export class Bot {
 
     const paging = this.formatPaging(sentenceNum, user.lesson.id);
     const text = markupText(
-      `${paging}\n${RU}` + user.getRusString() + `\n${EN}`,
+      `${paging}\n${RU}` + user.getRusString() + user.getWords() + `\n${EN}`,
     );
 
     this.sendMessage(chatId, text, {
@@ -342,6 +354,7 @@ export class Bot {
       const text = markupText(
         `${paging}\n${RU}` +
           user.getRusString() +
+          user.getWords() +
           `\n${EN}` +
           user.getEngTextString(),
       );
@@ -367,6 +380,7 @@ export class Bot {
           markupText(
             `${paging}\n${RU}` +
               user.getRusString() +
+              user.getWords() +
               `\n${EN}` +
               user.getEngTextString(),
           ) +
@@ -387,6 +401,7 @@ export class Bot {
         const text = markupText(
           `${paging}\n${RU}` +
             user.getRusString() +
+            user.getWords() +
             `\n${EN}` +
             user.getEngTextString(),
         );
@@ -408,6 +423,7 @@ export class Bot {
 
   run() {
     this.bot.onText(/\/start/, this.onStart);
+    this.bot.onText(/\/contents/, this.onShowContents);
     this.bot.onText(/^\/\d+$/, this.onStartLesson);
     this.bot.on('message', this.onMessage);
     this.bot.on('callback_query', this.onCallbackQuery);

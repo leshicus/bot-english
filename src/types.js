@@ -31,3 +31,14 @@ export type Query = {
 };
 
 export type Message = Object;
+
+export type Word = {| rus: string, eng: string |};
+
+export type LessonBasic = {
+  _id: number,
+  old_id: number,
+  lesson: number,
+  rus: string,
+  eng: string,
+  words: Array<Word>,
+};
