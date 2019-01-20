@@ -48,7 +48,7 @@ export class User {
   getWords() {
     if (this.lesson.words && this.lesson.words.length) {
       return this.lesson.words.reduce((acc, obj) => {
-        return '\n' + '• ' + obj.rus + ' - ' + obj.eng;
+        return '\n' + '■ <i>' + obj.rus + ' - ' + obj.eng + '</i>';
       }, '');
     } else return '';
   }
