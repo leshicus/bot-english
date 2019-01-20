@@ -40,13 +40,13 @@ export class Bot {
     // this.mongo.copyCollection('lessons');
   }
 
-  // getLessons = () => {
-  //   return this.mongo.lessons;
-  // };
+  getLessons = () => {
+    return this.mongo.lessons;
+  };
 
-  // getLessonsList = () => {
-  //   return this.mongo.lessonsList;
-  // };
+  getLessonsList = () => {
+    return this.mongo.lessonsList;
+  };
 
   sendMessage(id: number, msg: string, options?: Object) {
     if (msg.length > TG_MAX_LENGTH) {
