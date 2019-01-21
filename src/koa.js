@@ -34,6 +34,10 @@ export const runWebServer = (bot: any) => {
     .get('/lessonsList', async (ctx, next) => {
       const lessonsList = await bot.getLessonsList();
       ctx.body = formatJson(makeResp(lessonsList));
+    })
+    .get('/users', async (ctx, next) => {
+      const usersData = await bot.getUsersData();
+      ctx.body = formatJson(makeResp(usersData));
     });
 
   app.use(router.routes());

@@ -82,7 +82,7 @@ export class Mongo {
     log('loadLessons');
 
     try {
-      if (process.env.NODE_ENV === 'development' && !DEBUG_MONGO) {
+      if (process.env.NODE_ENV === 'development') {
         this.lessons = [
           ...require('./test/1.json'),
           ...require('./test/2.json'),
@@ -193,7 +193,7 @@ export class Mongo {
     log('loadLessonsList');
 
     try {
-      if (process.env.NODE_ENV === 'development' && !DEBUG_MONGO) {
+      if (process.env.NODE_ENV === 'development') {
         this.lessonsList = require('./test/lessonsList.json');
       } else {
         this.lessonsList = await this.getCollection(COLLECTION_LESSONS_LIST);
