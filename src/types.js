@@ -15,8 +15,13 @@ type Chat = {
   type: string,
 };
 
+export type Message = {
+  chat: { id: number },
+  from: From,
+};
+
 export type Query = {
-  id: string,
+  id: number,
   from: From,
   message: {
     message_id: number,
@@ -30,9 +35,7 @@ export type Query = {
   data: string,
 };
 
-export type Message = Object;
-
-export type Word = {| rus: string, eng: string |};
+export type Word = { rus: string, eng: string };
 
 export type LessonBasic = {
   _id: number,
@@ -41,4 +44,30 @@ export type LessonBasic = {
   rus: string,
   eng: string,
   words: Array<Word>,
+};
+
+export type Lesson = {
+  id: number,
+  sentenceId: number,
+  rus: string,
+  eng: Array<string>,
+  engText: Array<string>,
+  engButtons: Array<string>,
+  words: Array<Word>,
+};
+
+export type UserType = {
+  id: number,
+  username: string,
+  first_name: string,
+  language_code?: string,
+  lesson: Lesson,
+  +getRusString: () => string,
+  +getWords: () => string,
+  +getEngTextString: () => string,
+  +getEngString: () => string,
+};
+
+export type UsersType = {
+  [number]: UserType,
 };

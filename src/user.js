@@ -1,15 +1,14 @@
 //@flow
-import { type Word } from './types';
+import { type Word, type UserType, type Lesson } from './types';
 
-export class User {
+export class User<UserType> {
   id: number;
   username: string;
   first_name: string;
-  language_code: string;
+  language_code: string | void;
   lesson: Lesson = {
     id: 1,
     sentenceId: 1,
-    // rus: [],
     rus: '',
     eng: [],
     engText: [],
@@ -21,7 +20,7 @@ export class User {
     id: number,
     first_name: string,
     username: string,
-    language_code: string,
+    language_code?: string,
   ) {
     this.id = id;
     this.username = username;
@@ -63,18 +62,3 @@ export class User {
     else return '';
   }
 }
-
-export type Users = {
-  [string]: User,
-};
-
-export type Lesson = {
-  id: number,
-  sentenceId: number,
-  rus: string,
-  // rus: Array<string>,
-  eng: Array<string>,
-  engText: Array<string>,
-  engButtons: Array<string>,
-  words: Array<Word>,
-};

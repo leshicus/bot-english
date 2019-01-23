@@ -3,8 +3,7 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { promisify } from 'util';
 import fs from 'fs';
 import { log, processRussianSentence, divideSentenceByDot } from './utils';
-import { type Lesson } from './user';
-import { type LessonBasic } from './types';
+import { type LessonBasic, type Lesson } from './types';
 
 const readFile = promisify(fs.readFile);
 

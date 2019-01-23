@@ -1,16 +1,10 @@
 // @flow
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
-import {
-  log,
-  logMsg,
-  shuffle,
-  processRussianSentence,
-  markupText,
-} from './utils';
+import { log, shuffle, processRussianSentence, markupText } from './utils';
 import type { Query, Message } from './types';
-import { User, type Users } from './user';
-import { type Lesson } from './user';
+import { User } from './user';
+import { type UsersType, type Lesson } from './types';
 import { MSG_MAX_LEN } from './constants';
 
 const WORDS_IN_ROW = 3;
@@ -38,7 +32,7 @@ const CONTINUE_BUTTON = {
 
 export class Bot {
   bot: TelegramBot;
-  users: Users;
+  users: UsersType;
   mongo: Mongo;
   lessons: Array<Object>;
   lessonsList: Array<Object>;
@@ -244,7 +238,7 @@ export class Bot {
       const eng = sentencesInLesson[sentenceNum].eng;
       const words = sentencesInLesson[sentenceNum].words;
 
-      this.users[String(chatId)].lesson = {
+      this.users[chatId].lesson = {
         id: lessonId,
         sentenceId: sentenceNum + 1,
         rus: rus,
@@ -272,7 +266,7 @@ export class Bot {
   ) {
     log('showSentenceToUser');
 
-    const user = this.users[String(chatId)];
+    const user = this.users[chatId];
 
     const inline_keyboard = this.makeAnswerKeyboard(chatId);
 
@@ -292,7 +286,7 @@ export class Bot {
   removePressedButton(chatId: number, idxToRemove?: number) {
     log('removePressedButton', idxToRemove);
 
-    const user = this.users[String(chatId)];
+    const user = this.users[chatId];
     let { lesson: { engText, engButtons } } = user;
 
     if (idxToRemove != undefined && engButtons.length) {
@@ -304,7 +298,7 @@ export class Bot {
   }
 
   removeLastWord(chatId: number) {
-    const user = this.users[String(chatId)];
+    const user = this.users[chatId];
     let { lesson: { engText, engButtons } } = user;
 
     if (engText.length) {
@@ -316,7 +310,7 @@ export class Bot {
   makeAnswerKeyboard(chatId: number) {
     log('makeAnswerKeyboard');
 
-    const user = this.users[String(chatId)];
+    const user = this.users[chatId];
     let { lesson: { engButtons, engText } } = user;
 
     let answerKeyboard = [];
@@ -364,7 +358,7 @@ export class Bot {
       message: { chat: { id: chatId }, message_id, text } = {},
       data,
     } = query;
-    const user = this.users[String(chatId)];
+    const user = this.users[chatId];
 
     const { i: idxToRemove, w: word } = JSON.parse(data);
 
