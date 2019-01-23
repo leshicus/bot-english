@@ -377,7 +377,23 @@ export class Bot {
 
     if (word === CONTINUE) {
       const sentenceNum = user.lesson.sentenceId - 1;
-      this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
+
+      (async () => {
+        try {
+          const {
+            message_id: editedMesId,
+          } = await this.bot.editMessageReplyMarkup(null, {
+            chat_id: chatId,
+            message_id,
+          });
+
+          if (editedMesId) {
+            this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
+          }
+        } catch (e) {
+          log(e);
+        }
+      })();
     } else if (word === DELETE) {
       this.removeLastWord(chatId);
 
