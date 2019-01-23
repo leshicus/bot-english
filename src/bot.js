@@ -4,7 +4,13 @@ import { Mongo } from './mongo';
 import { log, shuffle, processRussianSentence, markupText } from './utils';
 import type { Query, Message } from './types';
 import { User } from './user';
-import { type UsersType, type Lesson } from './types';
+import {
+  type UsersType,
+  type Lesson,
+  type KeyboardButton,
+  type KeyboardRow,
+  type Keyboard,
+} from './types';
 import { MSG_MAX_LEN } from './constants';
 
 const WORDS_IN_ROW = 3;
@@ -313,8 +319,8 @@ export class Bot {
     const user = this.users[chatId];
     let { lesson: { engButtons, engText } } = user;
 
-    let answerKeyboard = [];
-    let row = [];
+    let answerKeyboard: Keyboard = [];
+    let row: KeyboardRow = [];
 
     if (engButtons.length) {
       engButtons.forEach((word, idx) => {
@@ -351,7 +357,32 @@ export class Bot {
     return answerKeyboard;
   }
 
-  onCallbackQuery = (query: Query) => {
+  async editMessageText(query: Query, text: string, answerKeyboard: Keyboard) {
+    const { message: { chat: { id: chatId }, message_id } } = query;
+
+    const resMsg: Message = await this.bot.editMessageText(text, {
+      message_id,
+      chat_id: chatId,
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: answerKeyboard,
+      },
+    });
+    return resMsg;
+  }
+
+  async editMessageReplyMarkup(query: Query) {
+    const { message: { chat: { id: chatId }, message_id } } = query;
+
+    const resMsg: Message = await this.bot.editMessageReplyMarkup(null, {
+      chat_id: chatId,
+      message_id,
+    });
+
+    return resMsg;
+  }
+
+  onCallbackQuery = async (query: Query) => {
     log('onCallbackQuery');
 
     const {
@@ -372,22 +403,13 @@ export class Bot {
     if (word === CONTINUE) {
       const sentenceNum = user.lesson.sentenceId - 1;
 
-      (async () => {
-        try {
-          const {
-            message_id: editedMesId,
-          } = await this.bot.editMessageReplyMarkup(null, {
-            chat_id: chatId,
-            message_id,
-          });
+      const { message_id: editedMesId } = await this.editMessageReplyMarkup(
+        query,
+      );
 
-          if (editedMesId) {
-            this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
-          }
-        } catch (e) {
-          log(e);
-        }
-      })();
+      if (editedMesId) {
+        this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
+      }
     } else if (word === DELETE) {
       this.removeLastWord(chatId);
 
@@ -401,14 +423,7 @@ export class Bot {
           user.getEngTextString(),
       );
 
-      this.bot.editMessageText(text, {
-        message_id,
-        chat_id: chatId,
-        parse_mode: 'HTML',
-        reply_markup: {
-          inline_keyboard: answerKeyboard,
-        },
-      });
+      this.editMessageText(query, text, answerKeyboard);
     } else {
       this.removePressedButton(chatId, idxToRemove);
 
@@ -428,14 +443,8 @@ export class Bot {
           ) +
           `\n${ANS}` +
           user.getEngString();
-        this.bot.editMessageText(text, {
-          message_id,
-          chat_id: chatId,
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: answerKeyboard,
-          },
-        });
+
+        this.editMessageText(query, text, answerKeyboard);
       } else {
         // buttons still exist
         const answerKeyboard = this.makeAnswerKeyboard(chatId);
@@ -447,14 +456,7 @@ export class Bot {
             `\n${EN}` +
             user.getEngTextString(),
         );
-        this.bot.editMessageText(text, {
-          message_id,
-          chat_id: chatId,
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: answerKeyboard,
-          },
-        });
+        this.editMessageText(query, text, answerKeyboard);
       }
     }
   };

@@ -16,21 +16,19 @@ type Chat = {
 };
 
 export type Message = {
-  chat: { id: number },
+  message_id: number,
+  chat: Chat,
   from: From,
+  date: number,
+  edit_date?: number,
+  text: string,
+  entities?: Array<Object>,
 };
 
 export type Query = {
   id: number,
   from: From,
-  message: {
-    message_id: number,
-    from: From,
-    chat: Chat,
-    date: number,
-    edit_date: number,
-    text: string,
-  },
+  message: Message,
   chat_instance: string,
   data: string,
 };
@@ -71,3 +69,10 @@ export type UserType = {
 export type UsersType = {
   [number]: UserType,
 };
+
+export type KeyboardButton = {|
+  text: string,
+  callback_data: string,
+|};
+export type KeyboardRow = Array<KeyboardButton>;
+export type Keyboard = Array<KeyboardRow>;
