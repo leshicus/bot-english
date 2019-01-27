@@ -4,6 +4,8 @@ import { promisify } from 'util';
 import fs from 'fs';
 import { log, processRussianSentence, divideSentenceByDot } from './utils';
 import { type LessonBasic, type Lesson } from './types';
+import { config } from 'dotenv';
+config();
 
 const readFile = promisify(fs.readFile);
 

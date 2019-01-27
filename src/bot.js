@@ -1,7 +1,13 @@
 // @flow
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
-import { log, shuffle, processRussianSentence, markupText } from './utils';
+import {
+  sortByLength,
+  log,
+  shuffle,
+  processRussianSentence,
+  markupText,
+} from './utils';
 import type { Query, Message } from './types';
 import { User } from './user';
 import {
@@ -10,12 +16,18 @@ import {
   type KeyboardButton,
   type KeyboardRow,
   type Keyboard,
+  type Markup,
 } from './types';
 import { MSG_MAX_LEN } from './constants';
 
-const WORDS_IN_ROW = 3;
-const CONTINUE = 'Дальше';
-const DELETE = 'Удалить';
+const WORDS_IN_ROW = 4;
+const CHARS_IN_ROW = 10;
+
+// const CONTINUE = 'Дальше';
+// const CONTINUE = '→';
+const CONTINUE = '⇨';
+// const DELETE = 'Удалить';
+const DELETE = '⌫';
 const EN = '<b>АНГ</b>: ';
 const RU = '<b>РУС</b>: ';
 const ANS = '<b>ОТВ</b>: ';
@@ -65,20 +77,13 @@ export class Bot {
     return this.users;
   };
 
-  sendMessage(id: number, msg: string, options?: Object) {
-    if (msg.length > TG_MAX_LENGTH) {
-      log(MSG_MAX_LEN, TG_MAX_LENGTH);
-    }
-
-    this.bot.sendMessage(id, msg.substr(0, TG_MAX_LENGTH), options);
-  }
-
   onStart = (msg: Message, match: Array<string>) => {
     log('onStart');
 
     const { from: { id, first_name, username, language_code } } = msg;
 
     this.registerUser(msg);
+    this.deleteLastKeyboard(id);
 
     this.sendMessage(
       id,
@@ -90,6 +95,8 @@ export class Bot {
     log('onShowContents');
 
     const { from: { id } } = msg;
+
+    this.deleteLastKeyboard(id);
 
     if (
       this.mongo.lessons &&
@@ -164,9 +171,9 @@ export class Bot {
       topics += `\n<b>Помощь</b>\nЧтобы начать определенную тему нажмите "\/номерТемы"
 Чтобы начать тему с определенного предложения нажмите "\/номер_номер"`;
 
-      this.sendMessage(chatId, topics, { parse_mode: 'HTML' });
+      this.sendMessage(chatId, topics);
     } else {
-      this.sendMessage(chatId, 'Темы не загружены', { parse_mode: 'HTML' });
+      this.sendMessage(chatId, 'Темы не загружены');
     }
   }
 
@@ -174,6 +181,9 @@ export class Bot {
     log('onStartLesson', match);
 
     const { chat: { id: chatId } } = msg;
+
+    this.deleteLastKeyboard(chatId);
+
     const lessonId = +match[0].slice(1);
 
     this.registerUser(msg);
@@ -185,6 +195,9 @@ export class Bot {
     log('onStartLessonFromNumber', match);
 
     const { chat: { id: chatId } } = msg;
+
+    this.deleteLastKeyboard(chatId);
+
     const arr = match[0].slice(1).split('_');
     const lessonId = +arr[0];
     const sentenceId = +arr[1] || 1;
@@ -243,14 +256,16 @@ export class Bot {
       const rus = sentencesInLesson[sentenceNum].rus;
       const eng = sentencesInLesson[sentenceNum].eng;
       const words = sentencesInLesson[sentenceNum].words;
+      const engWithoutPunctuationMarks = eng.replace(/\!|\,|\.|[\\?]/g, '');
 
       this.users[chatId].lesson = {
         id: lessonId,
         sentenceId: sentenceNum + 1,
         rus: rus,
-        // rus: processRussianSentence(rus),
-        eng: eng.replace(/\./g, '').split(' '),
-        engButtons: shuffle(eng.toLowerCase().replace(/\./g, '').split(' ')),
+        eng: eng,
+        engButtons: sortByLength(
+          shuffle(engWithoutPunctuationMarks.toLowerCase().split(' ')),
+        ),
         engText: [],
         words: words,
       };
@@ -265,7 +280,7 @@ export class Bot {
       1}/${sentencesInLesson.length}`;
   }
 
-  showSentenceToUser(
+  async showSentenceToUser(
     chatId: number,
     sentenceNum: number,
     sentencesInLesson: Array<Lesson>,
@@ -281,25 +296,9 @@ export class Bot {
       `${paging}\n${RU}` + user.getRusString() + user.getWords() + `\n${EN}`,
     );
 
-    this.sendMessage(chatId, text, {
-      reply_markup: {
-        inline_keyboard,
-      },
-      parse_mode: 'HTML',
-    });
-  }
-
-  removePressedButton(chatId: number, idxToRemove?: number) {
-    log('removePressedButton', idxToRemove);
-
-    const user = this.users[chatId];
-    let { lesson: { engText, engButtons } } = user;
-
-    if (idxToRemove != undefined && engButtons.length) {
-      user.lesson.engButtons = engButtons.filter(
-        (item, idx) => idx !== idxToRemove,
-      );
-      user.lesson.engText.push(engButtons[idxToRemove]);
+    const message_id = await this.sendMessage(chatId, text, inline_keyboard);
+    if (message_id) {
+      this.users[chatId].lastMessageId = message_id;
     }
   }
 
@@ -322,64 +321,152 @@ export class Bot {
     let answerKeyboard: Keyboard = [];
     let row: KeyboardRow = [];
 
-    if (engButtons.length) {
-      engButtons.forEach((word, idx) => {
-        if (row.length === WORDS_IN_ROW) {
-          answerKeyboard.push(row);
-          row = [];
-        }
-
-        if (row.length < WORDS_IN_ROW) {
-          row.push({
-            text: word,
-            callback_data: JSON.stringify({
-              w: word,
-              i: idx,
-            }),
-          });
-        }
-
-        // последний ряд, может быть не заполнен
-        if (engButtons && idx === engButtons.length - 1) {
-          answerKeyboard.push(row);
-        }
-      });
-
-      if (engText.length)
-        answerKeyboard.push([ DELETE_BUTTON, CONTINUE_BUTTON ]);
-      else {
-        answerKeyboard.push([ CONTINUE_BUTTON ]);
+    engButtons.forEach((word, idx) => {
+      if (row.length === WORDS_IN_ROW) {
+        answerKeyboard.push(row);
+        row = [];
       }
-    } else {
-      answerKeyboard.push([ DELETE_BUTTON, CONTINUE_BUTTON ]);
-    }
+
+      if (row.length < WORDS_IN_ROW) {
+        row.push({
+          text: word,
+          callback_data: JSON.stringify({
+            w: word,
+            i: idx,
+          }),
+        });
+      }
+
+      // последний ряд, может быть не заполнен
+      if (engButtons && idx === engButtons.length - 1) {
+        row.push(DELETE_BUTTON, CONTINUE_BUTTON);
+        answerKeyboard.push(row);
+      }
+    });
+
+    // answerKeyboard.push([ DELETE_BUTTON, CONTINUE_BUTTON ]);
 
     return answerKeyboard;
   }
 
-  async editMessageText(query: Query, text: string, answerKeyboard: Keyboard) {
-    const { message: { chat: { id: chatId }, message_id } } = query;
+  async sendMessage(id: number, msg: string, inline_keyboard?: Keyboard) {
+    log('sendMessage');
 
-    const resMsg: Message = await this.bot.editMessageText(text, {
-      message_id,
-      chat_id: chatId,
-      parse_mode: 'HTML',
-      reply_markup: {
-        inline_keyboard: answerKeyboard,
-      },
-    });
-    return resMsg;
+    if (msg.length > TG_MAX_LENGTH) {
+      log(MSG_MAX_LEN, TG_MAX_LENGTH);
+    }
+
+    const markup: Markup = { parse_mode: 'HTML' };
+    if (inline_keyboard) {
+      markup['reply_markup'] = {
+        inline_keyboard,
+      };
+    }
+
+    try {
+      const resp = await this.bot.sendMessage(
+        id,
+        msg.substr(0, TG_MAX_LENGTH),
+        markup,
+      );
+
+      if (resp) {
+        return resp.message_id;
+      } else {
+        return Promise.reject(
+          this.errorText('sendMessage', 'resp=', resp),
+        ).catch(() => {});
+      }
+    } catch (error) {
+      console.log(error);
+    }
   }
 
-  async editMessageReplyMarkup(query: Query) {
+  async editMessageText(
+    query: Query,
+    text: string,
+    inline_keyboard?: Keyboard,
+  ) {
+    log('editMessageText');
+
     const { message: { chat: { id: chatId }, message_id } } = query;
 
-    const resMsg: Message = await this.bot.editMessageReplyMarkup(null, {
-      chat_id: chatId,
-      message_id,
-    });
+    const markup: Markup = { parse_mode: 'HTML' };
+    if (inline_keyboard) {
+      markup['reply_markup'] = {
+        inline_keyboard,
+      };
+    }
 
-    return resMsg;
+    try {
+      const resp = await this.bot.editMessageText(text, {
+        message_id,
+        chat_id: chatId,
+        ...markup,
+      });
+
+      if (resp) {
+        return resp.message_id;
+      } else {
+        return Promise.reject(
+          this.errorText('editMessageText', 'resp=', resp),
+        ).catch(() => {});
+      }
+    } catch (error) {
+      const { response: { request: { path } } } = error;
+      log(
+        'try-catch error:',
+        error.name,
+        error.message,
+        path.split('/').splice(-1),
+      );
+    }
+  }
+
+  async deleteLastKeyboard(chatId: number) {
+    log('deleteLastKeyboard');
+    const user = this.users[chatId];
+
+    if (user) {
+      const lastMessageId = this.users[chatId].lastMessageId;
+
+      if (lastMessageId) {
+        try {
+          const resp = await this.bot.editMessageReplyMarkup(null, {
+            chat_id: chatId,
+            message_id: lastMessageId,
+          });
+
+          if (resp) {
+            return resp.message_id;
+          } else {
+            return Promise.reject(
+              this.errorText('deleteLastKeyboard', 'resp=', resp),
+            ).catch(() => {});
+          }
+        } catch (error) {
+          const { response: { request: { path } } } = error;
+          log(
+            'try-catch error:',
+            error.name,
+            error.message,
+            path.split('/').splice(-1),
+          );
+        }
+      } else {
+        return Promise.reject(
+          this.errorText('deleteLastKeyboard', 'lastMessageId=', lastMessageId),
+        ).catch(() => {});
+      }
+    } else {
+      return Promise.reject(
+        this.errorText('deleteLastKeyboard', 'user=', user),
+      ).catch(() => {});
+    }
+  }
+
+  errorText(where: string, ...params: Array<string | number | void | Object>) {
+    return `Error in *${where}*, ${JSON.stringify(params)}`;
   }
 
   onCallbackQuery = async (query: Query) => {
@@ -390,8 +477,18 @@ export class Bot {
       data,
     } = query;
     const user = this.users[chatId];
-
+    const { lesson: { engButtons, engText } } = user;
     const { i: idxToRemove, w: word } = JSON.parse(data);
+
+    if (!user) {
+      this.sendMessage(
+        chatId,
+        'Что-то пошло не так, начните тему или урок заново, нажав "/номер_номер"',
+      );
+      //! это после перезапуска сервера не находит юзера.
+      //! нужно посмотреть историю сообщений, и взять оттуда номер последненго урока и номер предложения.
+      return;
+    }
 
     const lessonId = user.lesson.id;
     const sentencesInLesson = this.getSentencesInLesson(lessonId);
@@ -402,18 +499,12 @@ export class Bot {
 
     if (word === CONTINUE) {
       const sentenceNum = user.lesson.sentenceId - 1;
-
-      const { message_id: editedMesId } = await this.editMessageReplyMarkup(
-        query,
-      );
-
-      if (editedMesId) {
-        this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
-      }
+      await this.deleteLastKeyboard(chatId);
+      this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
     } else if (word === DELETE) {
-      this.removeLastWord(chatId);
-
-      const answerKeyboard = this.makeAnswerKeyboard(chatId);
+      if (engText.length) {
+        user.lesson.engText = engText.slice(0, -1);
+      } else return;
 
       const text = markupText(
         `${paging}\n${RU}` +
@@ -423,41 +514,28 @@ export class Bot {
           user.getEngTextString(),
       );
 
+      const answerKeyboard = this.makeAnswerKeyboard(chatId);
       this.editMessageText(query, text, answerKeyboard);
     } else {
-      this.removePressedButton(chatId, idxToRemove);
-
-      const { lesson: { engButtons } } = user;
-
-      if (engButtons && !engButtons.length) {
-        // no buttons left, add 'continue'
-        const answerKeyboard = this.makeAnswerKeyboard(chatId);
-
-        const text =
-          markupText(
-            `${paging}\n${RU}` +
-              user.getRusString() +
-              user.getWords() +
-              `\n${EN}` +
-              user.getEngTextString(),
-          ) +
-          `\n${ANS}` +
-          user.getEngString();
-
-        this.editMessageText(query, text, answerKeyboard);
-      } else {
-        // buttons still exist
-        const answerKeyboard = this.makeAnswerKeyboard(chatId);
-
-        const text = markupText(
-          `${paging}\n${RU}` +
-            user.getRusString() +
-            user.getWords() +
-            `\n${EN}` +
-            user.getEngTextString(),
-        );
-        this.editMessageText(query, text, answerKeyboard);
+      if (engButtons.length) {
+        user.lesson.engText.push(engButtons[idxToRemove]);
       }
+
+      let text = markupText(
+        `${paging}\n${RU}` +
+          user.getRusString() +
+          user.getWords() +
+          `\n${EN}` +
+          user.getEngTextString(),
+      );
+
+      // show answer
+      if (engText.length === engButtons.length) {
+        text += `\n${ANS}` + user.getEngString();
+      }
+
+      const answerKeyboard = this.makeAnswerKeyboard(chatId);
+      this.editMessageText(query, text, answerKeyboard);
     }
   };
 

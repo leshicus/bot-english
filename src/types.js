@@ -48,7 +48,7 @@ export type Lesson = {
   id: number,
   sentenceId: number,
   rus: string,
-  eng: Array<string>,
+  eng: string,
   engText: Array<string>,
   engButtons: Array<string>,
   words: Array<Word>,
@@ -60,6 +60,7 @@ export type UserType = {
   first_name: string,
   language_code?: string,
   lesson: Lesson,
+  lastMessageId?: number,
   +getRusString: () => string,
   +getWords: () => string,
   +getEngTextString: () => string,
@@ -76,3 +77,10 @@ export type KeyboardButton = {|
 |};
 export type KeyboardRow = Array<KeyboardButton>;
 export type Keyboard = Array<KeyboardRow>;
+
+export type Markup = {
+  parse_mode: string,
+  reply_markup?: {
+    inline_keyboard: Keyboard,
+  },
+};

@@ -10,11 +10,12 @@ export class User<UserType> {
     id: 1,
     sentenceId: 1,
     rus: '',
-    eng: [],
+    eng: '',
     engText: [],
     engButtons: [],
     words: [],
   };
+  lastMessageId: number | void;
 
   constructor(
     id: number,
@@ -40,14 +41,15 @@ export class User<UserType> {
   }
 
   getEngString() {
-    if (this.lesson.eng) return this.lesson.eng.join(' ');
-    else return '';
+    // if (this.lesson.eng) return this.lesson.eng.join(' ');
+    // else return '';
+    return this.lesson.eng || '';
   }
 
   getWords() {
     if (this.lesson.words && this.lesson.words.length) {
       return this.lesson.words.reduce((acc, obj) => {
-        return '\n' + '■ <i>' + obj.rus + ' - ' + obj.eng + '</i>';
+        return acc + '\n' + '■ <i>' + obj.rus + ' - ' + obj.eng + '</i>';
       }, '');
     } else return '';
   }

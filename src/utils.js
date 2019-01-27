@@ -77,3 +77,11 @@ export const markupText = (str: string) => {
   // .replace(`${EN}:`, `<b>${EN}:</b>`)
   // .replace(`${RU}:`, `<b>${RU}:</b>`);
 };
+
+export const sortByLength = (arr: Array<string>): Array<string> => {
+  return arr.sort((a, b) => {
+    if (a.length > b.length) return -1;
+    else if (a.length < b.length) return 1;
+    else return 0;
+  });
+};

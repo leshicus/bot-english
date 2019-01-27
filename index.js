@@ -1,6 +1,8 @@
 // @flow
 import { Bot } from './src/bot';
 import { runWebServer } from './src/koa';
+// import { config } from 'dotenv';
+// config();
 
 process.env.NTBA_FIX_319 = '1';
 let token;
