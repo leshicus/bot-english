@@ -1,20 +1,12 @@
 //@flow
-import { type Word, type UserType, type Lesson } from './types';
+import { type Word, type Lesson } from './types';
 
-export class User<UserType> {
+export class User {
   id: number;
   username: string;
   first_name: string;
   language_code: string | void;
-  lesson: Lesson = {
-    id: 1,
-    sentenceId: 1,
-    rus: '',
-    eng: '',
-    engText: [],
-    engButtons: [],
-    words: [],
-  };
+  lesson: Lesson;
   lastMessageId: number | void;
 
   constructor(
@@ -27,9 +19,19 @@ export class User<UserType> {
     this.username = username;
     this.first_name = first_name;
     this.language_code = language_code;
+    this.lesson = {
+      id: 1,
+      sentenceId: 1,
+      rus: '',
+      eng: '',
+      engForCheck: '',
+      engText: [],
+      engButtons: [],
+      words: [],
+    };
   }
 
-  getRusString() {
+  getRusString(): string {
     // if (this.lesson.rus) {
     //   if (Array.isArray(this.lesson.rus)) {
     //     return this.lesson.rus.join(' ');
@@ -40,26 +42,26 @@ export class User<UserType> {
     return this.lesson.rus || '';
   }
 
-  getEngString() {
+  getEngString(): string {
     // if (this.lesson.eng) return this.lesson.eng.join(' ');
     // else return '';
     return this.lesson.eng || '';
   }
 
-  getWords() {
+  getWords(): string {
     if (this.lesson.words && this.lesson.words.length) {
       return this.lesson.words.reduce((acc, obj) => {
-        return acc + '\n' + '■ <i>' + obj.rus + ' - ' + obj.eng + '</i>';
-      }, '');
+        return acc + '\n      ' + '<b>' + obj.rus + ' - ' + obj.eng + '</b>';
+      }, '\n<i>Словарик:</i>');
     } else return '';
   }
 
-  getEngTextString() {
+  getEngTextString(): string {
     if (this.lesson.engText) return this.lesson.engText.join(' ');
     else return '';
   }
 
-  getEngButtonsString() {
+  getEngButtonsString(): string {
     if (this.lesson.engButtons) return this.lesson.engButtons.join(' ');
     else return '';
   }

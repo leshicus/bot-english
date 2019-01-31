@@ -22,7 +22,9 @@ import { type Word } from './types';
 // match:
 // [ '/echo 123', '123', index: 0, input: '/echo 123' ]
 
-export const log = (...args: Array<number | string | Array<string> | void>) => {
+export const log = (
+  ...args: Array<number | string | Array<string> | Object | void>
+) => {
   // if (process.env.NODE_ENV === 'development' || process.env.DEBUG) {
   console.log.apply(null, args);
   // }

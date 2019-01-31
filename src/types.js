@@ -49,6 +49,7 @@ export type Lesson = {
   sentenceId: number,
   rus: string,
   eng: string,
+  engForCheck: string,
   engText: Array<string>,
   engButtons: Array<string>,
   words: Array<Word>,
@@ -65,10 +66,6 @@ export type UserType = {
   +getWords: () => string,
   +getEngTextString: () => string,
   +getEngString: () => string,
-};
-
-export type UsersType = {
-  [number]: UserType,
 };
 
 export type KeyboardButton = {|

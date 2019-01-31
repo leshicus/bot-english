@@ -1,17 +1,10 @@
 // @flow
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
-import {
-  sortByLength,
-  log,
-  shuffle,
-  processRussianSentence,
-  markupText,
-} from './utils';
+import { sortByLength, log, shuffle, processRussianSentence } from './utils';
 import type { Query, Message } from './types';
 import { User } from './user';
 import {
-  type UsersType,
   type Lesson,
   type KeyboardButton,
   type KeyboardRow,
@@ -23,14 +16,17 @@ import { MSG_MAX_LEN } from './constants';
 const WORDS_IN_ROW = 4;
 const CHARS_IN_ROW = 10;
 
-// const CONTINUE = 'Дальше';
-// const CONTINUE = '→';
-const CONTINUE = '⇨';
-// const DELETE = 'Удалить';
-const DELETE = '⌫';
-const EN = '<b>АНГ</b>: ';
-const RU = '<b>РУС</b>: ';
-const ANS = '<b>ОТВ</b>: ';
+// ✅ ❌ ℹ️ ❓ ✂️ ⌫ ⇨ → 👁 ⬅️
+const CONTINUE = '➡️'; // '', '
+const DELETE = '✂️'; // ''
+const SHOW_ANSWER = 'ℹ️';
+const EN = '🇬🇧';
+const RU = '🇧🇬';
+const ANS = 'ℹ️';
+const TRANSLATE = '<i>Переведите на английский:</i>';
+const CORRECT = '✅';
+const WRONG = '❌';
+
 const TG_MAX_LENGTH = 4096; // telegram msg max length
 
 const DEBUG_MONGO = process.env.DEBUG_MONGO;
@@ -47,10 +43,16 @@ const CONTINUE_BUTTON = {
     w: CONTINUE,
   }),
 };
+const SHOW_ANSWER_BUTTON = {
+  text: SHOW_ANSWER,
+  callback_data: JSON.stringify({
+    w: SHOW_ANSWER,
+  }),
+};
 
 export class Bot {
   bot: TelegramBot;
-  users: UsersType;
+  users: { [number]: User };
   mongo: Mongo;
   lessons: Array<Object>;
   lessonsList: Array<Object>;
@@ -131,6 +133,34 @@ export class Bot {
     }
   };
 
+  onShowPairs = (msg: Message, match: Array<string>) => {
+    log('onShowPairs');
+
+    const { from: { id } } = msg;
+
+    this.deleteLastKeyboard(id);
+
+    if (this.mongo.pairs && this.mongo.pairs.length) {
+      this.showPairsContent(id);
+    } else {
+      this.sendMessage(id, `База с парами не загружена. Загружаю...`);
+
+      (async () => {
+        try {
+          const pairs = await this.mongo.loadPairs();
+
+          this.sendMessage(id, `Загружено: ${pairs.length} пар.`);
+
+          if (this.mongo.pairs && this.mongo.pairs.length) {
+            this.showPairsContent(id);
+          }
+        } catch (error) {
+          console.log(error);
+        }
+      })();
+    }
+  };
+
   registerUser(msg: Message) {
     log('registerUser');
 
@@ -146,35 +176,60 @@ export class Bot {
     }
   }
 
+  showPairs(chatId: number) {}
+
+  showPairsContent(chatId: number) {
+    log('showPairsContent');
+
+    let topics =
+      `<b>Темы</b>` +
+      this.mongo.pairs.reduce((acc, topic) => {
+        acc += `\n<b>${topic.topic}</b>\n`;
+
+        // if (topic.lessons && topic.lessons.length) {
+        //   acc += topic.lessons.reduce((ac, lesson) => {
+        //     const length = this.getSentencesInLesson(+lesson.id).length;
+
+        //     ac += `/${lesson.id} ${lesson.title} (${length}) \n`;
+
+        //     return ac;
+        //   }, '');
+        // }
+
+        return acc;
+      }, '');
+
+    topics += `\n<b>Помощь</b>\nЧтобы начать определенную тему нажмите "\/номерТемы"
+Чтобы начать тему с определенного предложения нажмите "\/номер_номер"`;
+
+    this.sendMessage(chatId, topics);
+  }
+
   showContents(chatId: number) {
     log('showContents');
 
-    if (this.mongo.lessonsList && this.mongo.lessonsList.length) {
-      let topics =
-        `<b>Темы</b>` +
-        this.mongo.lessonsList.reduce((acc, topic) => {
-          acc += `\n<b>${topic.title}</b>\n`;
+    let topics =
+      `<b>Темы</b>` +
+      this.mongo.lessonsList.reduce((acc, topic) => {
+        acc += `\n<b>${topic.title}</b>\n`;
 
-          if (topic.lessons && topic.lessons.length) {
-            acc += topic.lessons.reduce((ac, lesson) => {
-              const length = this.getSentencesInLesson(+lesson.id).length;
+        if (topic.lessons && topic.lessons.length) {
+          acc += topic.lessons.reduce((ac, lesson) => {
+            const length = this.getSentencesInLesson(+lesson.id).length;
 
-              ac += `/${lesson.id} ${lesson.title} (${length}) \n`;
+            ac += `/${lesson.id} ${lesson.title} (${length}) \n`;
 
-              return ac;
-            }, '');
-          }
+            return ac;
+          }, '');
+        }
 
-          return acc;
-        }, '');
+        return acc;
+      }, '');
 
-      topics += `\n<b>Помощь</b>\nЧтобы начать определенную тему нажмите "\/номерТемы"
+    topics += `\n<b>Помощь</b>\nЧтобы начать определенную тему нажмите "\/номерТемы"
 Чтобы начать тему с определенного предложения нажмите "\/номер_номер"`;
 
-      this.sendMessage(chatId, topics);
-    } else {
-      this.sendMessage(chatId, 'Темы не загружены');
-    }
+    this.sendMessage(chatId, topics);
   }
 
   onStartLesson = (msg: Message, match: Array<string>) => {
@@ -216,7 +271,8 @@ export class Bot {
     }
   };
 
-  getSentencesInLesson(lessonId: number) {
+  getSentencesInLesson(lessonId: number): Array<Object> {
+    // $FlowFixMe
     return this.mongo.lessons.filter(lesson => lesson.lesson === lessonId);
   }
 
@@ -256,15 +312,18 @@ export class Bot {
       const rus = sentencesInLesson[sentenceNum].rus;
       const eng = sentencesInLesson[sentenceNum].eng;
       const words = sentencesInLesson[sentenceNum].words;
-      const engWithoutPunctuationMarks = eng.replace(/\!|\,|\.|[\\?]/g, '');
+      const engWithoutPunctuationMarks = eng
+        .replace(/\!|\,|\.|[\\?|\:|\;|\-]/g, '')
+        .toLowerCase();
 
       this.users[chatId].lesson = {
         id: lessonId,
         sentenceId: sentenceNum + 1,
         rus: rus,
         eng: eng,
+        engForCheck: engWithoutPunctuationMarks,
         engButtons: sortByLength(
-          shuffle(engWithoutPunctuationMarks.toLowerCase().split(' ')),
+          shuffle(engWithoutPunctuationMarks.split(' ')),
         ),
         engText: [],
         words: words,
@@ -276,8 +335,8 @@ export class Bot {
 
   formatPaging(sentenceNum: number, lessonId: number) {
     const sentencesInLesson = this.getSentencesInLesson(lessonId);
-    return `Тема: ${lessonId}, урок: ${sentenceNum +
-      1}/${sentencesInLesson.length}`;
+    return `<i>Тема: ${lessonId}, урок: ${sentenceNum +
+      1} из ${sentencesInLesson.length}</i>`;
   }
 
   async showSentenceToUser(
@@ -292,9 +351,14 @@ export class Bot {
     const inline_keyboard = this.makeAnswerKeyboard(chatId);
 
     const paging = this.formatPaging(sentenceNum, user.lesson.id);
-    const text = markupText(
-      `${paging}\n${RU}` + user.getRusString() + user.getWords() + `\n${EN}`,
-    );
+    const text =
+      `${paging}` +
+      user.getWords() +
+      `\n${TRANSLATE}\n${RU} ` +
+      '<b>' +
+      user.getRusString() +
+      '</b>' +
+      `\n${EN} `;
 
     const message_id = await this.sendMessage(chatId, text, inline_keyboard);
     if (message_id) {
@@ -339,12 +403,12 @@ export class Bot {
 
       // последний ряд, может быть не заполнен
       if (engButtons && idx === engButtons.length - 1) {
-        row.push(DELETE_BUTTON, CONTINUE_BUTTON);
+        // row.push(SHOW_ANSWER_BUTTON, DELETE_BUTTON, CONTINUE_BUTTON);
         answerKeyboard.push(row);
       }
     });
 
-    // answerKeyboard.push([ DELETE_BUTTON, CONTINUE_BUTTON ]);
+    answerKeyboard.push([ SHOW_ANSWER_BUTTON, DELETE_BUTTON, CONTINUE_BUTTON ]);
 
     return answerKeyboard;
   }
@@ -477,7 +541,7 @@ export class Bot {
       data,
     } = query;
     const user = this.users[chatId];
-    const { lesson: { engButtons, engText } } = user;
+    const { lesson: { engButtons, engText, engForCheck, eng } } = user;
     const { i: idxToRemove, w: word } = JSON.parse(data);
 
     if (!user) {
@@ -501,18 +565,41 @@ export class Bot {
       const sentenceNum = user.lesson.sentenceId - 1;
       await this.deleteLastKeyboard(chatId);
       this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
+    } else if (word === SHOW_ANSWER) {
+      let text =
+        `${paging}` +
+        user.getWords() +
+        `\n${TRANSLATE}\n${RU} ` +
+        '<b>' +
+        user.getRusString() +
+        '</b>' +
+        `\n${EN} ` +
+        '<b>' +
+        user.getEngTextString() +
+        '</b>' +
+        `\n${ANS} ` +
+        '<b>' +
+        user.getEngString() +
+        '</b>';
+
+      const answerKeyboard = this.makeAnswerKeyboard(chatId);
+      this.editMessageText(query, text, answerKeyboard);
     } else if (word === DELETE) {
       if (engText.length) {
         user.lesson.engText = engText.slice(0, -1);
       } else return;
 
-      const text = markupText(
-        `${paging}\n${RU}` +
-          user.getRusString() +
-          user.getWords() +
-          `\n${EN}` +
-          user.getEngTextString(),
-      );
+      const text =
+        `${paging}` +
+        user.getWords() +
+        `\n${TRANSLATE}\n${RU} ` +
+        '<b>' +
+        user.getRusString() +
+        '</b>' +
+        `\n${EN} ` +
+        '<b>' +
+        user.getEngTextString() +
+        '</b>';
 
       const answerKeyboard = this.makeAnswerKeyboard(chatId);
       this.editMessageText(query, text, answerKeyboard);
@@ -521,17 +608,25 @@ export class Bot {
         user.lesson.engText.push(engButtons[idxToRemove]);
       }
 
-      let text = markupText(
-        `${paging}\n${RU}` +
-          user.getRusString() +
-          user.getWords() +
-          `\n${EN}` +
-          user.getEngTextString(),
-      );
+      let text =
+        `${paging}` +
+        user.getWords() +
+        `\n${TRANSLATE}\n${RU} ` +
+        '<b>' +
+        user.getRusString() +
+        '</b>' +
+        `\n${EN} ` +
+        '<b>' +
+        user.getEngTextString() +
+        '</b>';
 
       // show answer
       if (engText.length === engButtons.length) {
-        text += `\n${ANS}` + user.getEngString();
+        if (engForCheck === user.getEngTextString()) {
+          text += ` ${CORRECT}`;
+        } else {
+          text += ` ${WRONG}` + `\n${ANS} ` + eng;
+        }
       }
 
       const answerKeyboard = this.makeAnswerKeyboard(chatId);
@@ -540,12 +635,13 @@ export class Bot {
   };
 
   onMessage = (msg: Message) => {
-    log('onMessage');
+    log('onMessage', msg);
   };
 
   run() {
     this.bot.onText(/\/start/, this.onStart);
-    this.bot.onText(/\/contents/, this.onShowContents);
+    this.bot.onText(/\/kespa/, this.onShowContents);
+    this.bot.onText(/\/pairs/, this.onShowPairs);
     this.bot.onText(/^\/\d+$/, this.onStartLesson);
     this.bot.onText(/^\/\d+_\d+$/, this.onStartLessonFromNumber);
     this.bot.on('message', this.onMessage);

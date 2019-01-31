@@ -14,6 +14,7 @@ const MONGODB_HOST = process.env.MONGODB_HOST || '';
 const DB = 'bot';
 const COLLECTION_LESSONS = 'lessons_1';
 const COLLECTION_LESSONS_LIST = 'lessonsList';
+const COLLECTION_PAIRS = 'pairs';
 
 const DEBUG_MONGO = process.env.DEBUG_MONGO;
 
@@ -32,22 +33,17 @@ const MONGO_URL = `mongodb+srv://alex:${MONGODB_PASSWORD}@${MONGODB_HOST}/${DB}?
 export class Mongo {
   lessons: Array<Object> = [];
   lessonsList: Array<Object> = [];
+  pairs: Array<Object> = [];
 
   constructor() {
-    this.loadData();
-  }
-
-  loadData = async () => {
     try {
-      const lessons = await this.loadLessons();
-      log('Загружено уроков: ', lessons ? lessons.length : 0);
-
-      const lessonsList = await this.loadLessonsList();
-      log('Загружено тем уроков: ', lessonsList ? lessonsList.length : 0);
+      this.loadLessons();
+      this.loadLessonsList();
+      this.loadPairs();
     } catch (error) {
       log(error);
     }
-  };
+  }
 
   async getClient() {
     try {
@@ -97,6 +93,8 @@ export class Mongo {
     } catch (error) {
       log(error);
     }
+
+    log('Загружено уроков: ', this.lessons ? this.lessons.length : 0);
 
     return this.lessons;
   }
@@ -203,7 +201,30 @@ export class Mongo {
       log(error);
     }
 
+    log(
+      'Загружено тем уроков: ',
+      this.lessonsList ? this.lessonsList.length : 0,
+    );
+
     return this.lessonsList;
+  }
+
+  async loadPairs() {
+    log('loadPairs');
+
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        this.pairs = require('./test/pairs.json');
+      } else {
+        this.pairs = await this.getCollection(COLLECTION_PAIRS);
+      }
+    } catch (error) {
+      log(error);
+    }
+
+    log('Загружено пар: ', this.pairs ? this.pairs.length : 0);
+
+    return this.pairs;
   }
 
   getNumberOfLessons = () => {
