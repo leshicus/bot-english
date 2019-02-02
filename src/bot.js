@@ -11,51 +11,32 @@ import {
   type Keyboard,
   type Markup,
 } from './types';
-import { MSG_MAX_LEN } from './constants';
-
-const WORDS_IN_ROW = 4;
-const CHARS_IN_ROW = 10;
-
-// ✅ ❌ ℹ️ ❓ ✂️ ⌫ ⇨ → 👁 ⬅️
-const CONTINUE = '➡️'; // '', '
-const DELETE = '✂️'; // ''
-const SHOW_ANSWER = 'ℹ️';
-const EN = '🇬🇧';
-const RU = '🇧🇬';
-const ANS = 'ℹ️';
-const TRANSLATE = '<i>Переведите на английский:</i>';
-const CORRECT = '✅';
-const WRONG = '❌';
-
-const TG_MAX_LENGTH = 4096; // telegram msg max length
+import {
+  MSG_MAX_LEN,
+  PREFIX_KESPA,
+  PREFIX_PAIRS,
+  TOPIC_IS_EMPTY,
+  COMMAND_NOT_FOUND,
+  AVAILABLE_COMMANDS,
+  WORDS_IN_ROW,
+  CONTINUE,
+  DELETE,
+  SHOW_ANSWER,
+  EN,
+  RU,
+  ANS,
+  TRANSLATE,
+  CORRECT,
+  WRONG,
+  TG_MAX_LENGTH,
+} from './constants';
 
 const DEBUG_MONGO = process.env.DEBUG_MONGO;
-
-const DELETE_BUTTON = {
-  text: DELETE,
-  callback_data: JSON.stringify({
-    w: DELETE,
-  }),
-};
-const CONTINUE_BUTTON = {
-  text: CONTINUE,
-  callback_data: JSON.stringify({
-    w: CONTINUE,
-  }),
-};
-const SHOW_ANSWER_BUTTON = {
-  text: SHOW_ANSWER,
-  callback_data: JSON.stringify({
-    w: SHOW_ANSWER,
-  }),
-};
 
 export class Bot {
   bot: TelegramBot;
   users: { [number]: User };
   mongo: Mongo;
-  lessons: Array<Object>;
-  lessonsList: Array<Object>;
 
   constructor(token: string) {
     this.bot = new TelegramBot(token, { polling: true });
@@ -63,8 +44,6 @@ export class Bot {
     this.users = {};
 
     this.mongo = new Mongo();
-
-    // this.mongo.copyCollection('lessons');
   }
 
   getLessons = () => {
@@ -89,8 +68,9 @@ export class Bot {
 
     this.sendMessage(
       id,
-      `Привет, ${first_name}!\nЭто бот для тренировки английских предложений.\nДоступные темы: /contents`,
+      `Привет, ${first_name}!\nЭто бот для тренировки английских предложений.`,
     );
+    this.showCommandsHelpMessage(id);
   };
 
   onShowContents = (msg: Message, match: Array<string>) => {
@@ -100,31 +80,23 @@ export class Bot {
 
     this.deleteLastKeyboard(id);
 
-    if (
-      this.mongo.lessons &&
-      this.mongo.lessons.length &&
-      this.mongo.lessonsList &&
-      this.mongo.lessonsList.length
-    ) {
+    if (this.mongo.lessons.total && this.mongo.lessonsList.total) {
       this.showContents(id);
     } else {
-      this.sendMessage(id, `База с уроками не загружена. Загружаю...`);
+      this.sendMessage(id, `База с уроками не загружена. Загружаю...🤨`);
 
       (async () => {
         try {
           const lessons = await this.mongo.loadLessons();
           const lessonsList = await this.mongo.loadLessonsList();
 
-          this.sendMessage(id, `Загружено: ${lessonsList.length} тем.`);
-          this.sendMessage(id, `Загружено: ${lessons.length} уроков.`);
+          this.sendMessage(id, `Загружено: ${lessonsList.total} тем 😀`);
+          this.sendMessage(id, `Загружено: ${lessons.total} уроков 😀`);
 
-          if (
-            this.mongo.lessons &&
-            this.mongo.lessons.length &&
-            this.mongo.lessonsList &&
-            this.mongo.lessonsList.length
-          ) {
+          if (this.mongo.lessons.total && this.mongo.lessonsList.total) {
             this.showContents(id);
+          } else {
+            this.sendMessage(id, `Не получилось загрузить уроки 😕`);
           }
         } catch (error) {
           console.log(error);
@@ -140,19 +112,29 @@ export class Bot {
 
     this.deleteLastKeyboard(id);
 
-    if (this.mongo.pairs && this.mongo.pairs.length) {
+    if (this.mongo.pairs.total && this.mongo.pairTopics.total) {
       this.showPairsContent(id);
     } else {
-      this.sendMessage(id, `База с парами не загружена. Загружаю...`);
+      this.sendMessage(id, `База с парами не загружена. Загружаю...🤨`);
 
       (async () => {
         try {
-          const pairs = await this.mongo.loadPairs();
+          let pairs = [];
+          let pairTopics = [];
 
-          this.sendMessage(id, `Загружено: ${pairs.length} пар.`);
+          if (!this.mongo.pairs.total) {
+            pairs = await this.mongo.loadPairs();
+            this.sendMessage(id, `Загружено: ${pairs.total} пар 😀`);
+          }
+          if (!this.mongo.pairTopics.total) {
+            pairTopics = await this.mongo.loadPairTopics();
+            this.sendMessage(id, `Загружено: ${pairTopics.total} тем пар 😀`);
+          }
 
-          if (this.mongo.pairs && this.mongo.pairs.length) {
+          if (this.mongo.pairs.total && this.mongo.pairTopics.total) {
             this.showPairsContent(id);
+          } else {
+            this.sendMessage(id, `Не получилось загрузить пары 😕`);
           }
         } catch (error) {
           console.log(error);
@@ -183,24 +165,11 @@ export class Bot {
 
     let topics =
       `<b>Темы</b>` +
-      this.mongo.pairs.reduce((acc, topic) => {
-        acc += `\n<b>${topic.topic}</b>\n`;
-
-        // if (topic.lessons && topic.lessons.length) {
-        //   acc += topic.lessons.reduce((ac, lesson) => {
-        //     const length = this.getSentencesInLesson(+lesson.id).length;
-
-        //     ac += `/${lesson.id} ${lesson.title} (${length}) \n`;
-
-        //     return ac;
-        //   }, '');
-        // }
+      this.mongo.pairTopics.data.reduce((acc, topic) => {
+        acc += `\n/p${topic.id} ${topic.name}`;
 
         return acc;
       }, '');
-
-    topics += `\n<b>Помощь</b>\nЧтобы начать определенную тему нажмите "\/номерТемы"
-Чтобы начать тему с определенного предложения нажмите "\/номер_номер"`;
 
     this.sendMessage(chatId, topics);
   }
@@ -210,14 +179,15 @@ export class Bot {
 
     let topics =
       `<b>Темы</b>` +
-      this.mongo.lessonsList.reduce((acc, topic) => {
+      this.mongo.lessonsList.data.reduce((acc, topic) => {
         acc += `\n<b>${topic.title}</b>\n`;
 
         if (topic.lessons && topic.lessons.length) {
           acc += topic.lessons.reduce((ac, lesson) => {
-            const length = this.getSentencesInLesson(+lesson.id).length;
+            const length = this.getSentencesInLesson(+lesson.id, PREFIX_KESPA)
+              .length;
 
-            ac += `/${lesson.id} ${lesson.title} (${length}) \n`;
+            ac += `/k${lesson.id} ${lesson.title} (${length}) \n`;
 
             return ac;
           }, '');
@@ -225,9 +195,6 @@ export class Bot {
 
         return acc;
       }, '');
-
-    topics += `\n<b>Помощь</b>\nЧтобы начать определенную тему нажмите "\/номерТемы"
-Чтобы начать тему с определенного предложения нажмите "\/номер_номер"`;
 
     this.sendMessage(chatId, topics);
   }
@@ -239,11 +206,12 @@ export class Bot {
 
     this.deleteLastKeyboard(chatId);
 
-    const lessonId = +match[0].slice(1);
+    const prefix = match[0].slice(1, 2);
+    const lessonId = +match[0].slice(2);
 
     this.registerUser(msg);
 
-    this.showNextSentence(chatId, 0, lessonId);
+    this.showNextSentence(chatId, 0, lessonId, prefix);
   };
 
   onStartLessonFromNumber = (msg: Message, match: Array<string>) => {
@@ -253,59 +221,94 @@ export class Bot {
 
     this.deleteLastKeyboard(chatId);
 
-    const arr = match[0].slice(1).split('_');
+    const arr = match[0].slice(2).split('_');
+    const prefix = match[0].slice(1, 2);
     const lessonId = +arr[0];
     const sentenceId = +arr[1] || 1;
     let sentenceNum = sentenceId - 1;
 
     this.registerUser(msg);
 
-    if (this.mongo.lessons && this.mongo.lessons.length) {
-      const lessonsLength = this.getSentencesInLesson(lessonId).length;
+    // if (this.mongo.lessons && this.mongo.lessons.length) {
+    const lessonsLength = this.getSentencesInLesson(lessonId, prefix).length;
 
-      if (lessonsLength <= sentenceNum) {
-        sentenceNum = lessonsLength - 1;
-      }
-
-      this.showNextSentence(chatId, sentenceNum, lessonId);
+    if (lessonsLength <= sentenceNum) {
+      sentenceNum = lessonsLength - 1;
     }
+
+    this.showNextSentence(chatId, sentenceNum, lessonId, prefix);
+    // }
   };
 
-  getSentencesInLesson(lessonId: number): Array<Object> {
-    // $FlowFixMe
-    return this.mongo.lessons.filter(lesson => lesson.lesson === lessonId);
-  }
-
-  showNextSentence(chatId: number, sentenceNum: number, lessonId: number) {
-    log('showNextSentence. sentenceNum=', sentenceNum, 'lessonId=', lessonId);
-
-    if (!this.mongo.lessons || !this.mongo.lessons.length) {
-      log('Не загружены уроки');
-      return;
+  getSentencesInLesson(lessonId: number, prefix: string): Array<Object> {
+    log('getSentencesInLesson', lessonId, prefix);
+    if (prefix === PREFIX_KESPA) {
+      // $FlowFixMe
+      return this.mongo.lessons.data.filter(
+        lesson => lesson.lesson === lessonId,
+      );
     }
 
-    const numberOfLessons = this.mongo.getNumberOfLessons();
+    if (prefix === PREFIX_PAIRS) {
+      // $FlowFixMe
+      return this.mongo.pairs.data.filter(pair => pair.topicId === lessonId);
+    }
 
-    if (lessonId > numberOfLessons) {
+    return [];
+  }
+
+  getPairsInTopic(topicId: number): Array<Object> {
+    // $FlowFixMe
+    return this.mongo.pairs.data.filter(pair => pair.topicId === topicId);
+  }
+
+  checkLessonLoaded(prefix: string) {
+    if (prefix === PREFIX_KESPA) {
+      return this.mongo.lessons.total;
+    }
+
+    if (prefix === PREFIX_PAIRS) {
+      return this.mongo.pairs.total;
+    }
+
+    return false;
+  }
+
+  showNextSentence(
+    chatId: number,
+    sentenceNum: number,
+    lessonId: number,
+    prefix: string,
+  ) {
+    log('showNextSentence. sentenceNum=', sentenceNum, 'lessonId=', lessonId);
+
+    if (!this.checkLessonLoaded(prefix)) return;
+
+    const getAmountOfTopics = this.mongo.getAmountOfTopics(prefix);
+    if (lessonId > getAmountOfTopics) {
       log(
-        `Номер урока ${lessonId} больше допустимого значения: ${numberOfLessons}`,
+        `Номер урока ${lessonId} больше допустимого значения: ${getAmountOfTopics}`,
       );
       return;
     }
 
-    let sentencesInLesson = this.getSentencesInLesson(lessonId);
+    let sentencesInLesson = this.getSentencesInLesson(lessonId, prefix);
+    if (!sentencesInLesson) {
+      this.sendMessage(chatId, TOPIC_IS_EMPTY);
+      return;
+    }
 
     // * закончились предложения в уроке - перейдем на след. урок
     if (sentenceNum > sentencesInLesson.length - 1) {
       // * закончились уроки - начнем сначала
-      if (lessonId >= numberOfLessons) {
+      if (lessonId >= getAmountOfTopics) {
         lessonId = 1;
       } else {
         lessonId++;
       }
 
       sentenceNum = 0;
-      sentencesInLesson = this.getSentencesInLesson(lessonId);
+      sentencesInLesson = this.getSentencesInLesson(lessonId, prefix);
     }
 
     if (sentencesInLesson && sentencesInLesson[sentenceNum]) {
@@ -330,11 +333,11 @@ export class Bot {
       };
     }
 
-    this.showSentenceToUser(chatId, sentenceNum, sentencesInLesson);
+    this.showSentenceToUser(chatId, sentenceNum, sentencesInLesson, prefix);
   }
 
-  formatPaging(sentenceNum: number, lessonId: number) {
-    const sentencesInLesson = this.getSentencesInLesson(lessonId);
+  formatPaging(sentenceNum: number, lessonId: number, prefix: string) {
+    const sentencesInLesson = this.getSentencesInLesson(lessonId, prefix);
     return `<i>Тема: ${lessonId}, урок: ${sentenceNum +
       1} из ${sentencesInLesson.length}</i>`;
   }
@@ -343,14 +346,15 @@ export class Bot {
     chatId: number,
     sentenceNum: number,
     sentencesInLesson: Array<Lesson>,
+    prefix: string,
   ) {
     log('showSentenceToUser');
 
     const user = this.users[chatId];
 
-    const inline_keyboard = this.makeAnswerKeyboard(chatId);
+    const inline_keyboard = this.makeAnswerKeyboard(chatId, prefix);
 
-    const paging = this.formatPaging(sentenceNum, user.lesson.id);
+    const paging = this.formatPaging(sentenceNum, user.lesson.id, prefix);
     const text =
       `${paging}` +
       user.getWords() +
@@ -376,7 +380,7 @@ export class Bot {
     }
   }
 
-  makeAnswerKeyboard(chatId: number) {
+  makeAnswerKeyboard(chatId: number, prefix: string) {
     log('makeAnswerKeyboard');
 
     const user = this.users[chatId];
@@ -394,23 +398,30 @@ export class Bot {
       if (row.length < WORDS_IN_ROW) {
         row.push({
           text: word,
-          callback_data: JSON.stringify({
-            w: word,
-            i: idx,
-          }),
+          callback_data: `${word}|${prefix}|${idx}`,
         });
       }
 
       // последний ряд, может быть не заполнен
       if (engButtons && idx === engButtons.length - 1) {
-        // row.push(SHOW_ANSWER_BUTTON, DELETE_BUTTON, CONTINUE_BUTTON);
         answerKeyboard.push(row);
       }
     });
 
-    answerKeyboard.push([ SHOW_ANSWER_BUTTON, DELETE_BUTTON, CONTINUE_BUTTON ]);
+    const answerButton = this.getActionButton(SHOW_ANSWER, prefix);
+    const deleteButton = this.getActionButton(DELETE, prefix);
+    const continueButton = this.getActionButton(CONTINUE, prefix);
+
+    answerKeyboard.push([ answerButton, deleteButton, continueButton ]);
 
     return answerKeyboard;
+  }
+
+  getActionButton(buttonName: string, prefix: string) {
+    return {
+      text: buttonName,
+      callback_data: `${buttonName}|${prefix}`,
+    };
   }
 
   async sendMessage(id: number, msg: string, inline_keyboard?: Keyboard) {
@@ -533,6 +544,14 @@ export class Bot {
     return `Error in *${where}*, ${JSON.stringify(params)}`;
   }
 
+  async onPressContinueButton(chatId: number, prefix: string) {
+    const user = this.users[chatId];
+    const nextSentenceNum = user.lesson.sentenceId;
+
+    await this.deleteLastKeyboard(chatId);
+    this.showNextSentence(chatId, nextSentenceNum, user.lesson.id, prefix);
+  }
+
   onCallbackQuery = async (query: Query) => {
     log('onCallbackQuery');
 
@@ -541,8 +560,6 @@ export class Bot {
       data,
     } = query;
     const user = this.users[chatId];
-    const { lesson: { engButtons, engText, engForCheck, eng } } = user;
-    const { i: idxToRemove, w: word } = JSON.parse(data);
 
     if (!user) {
       this.sendMessage(
@@ -554,17 +571,18 @@ export class Bot {
       return;
     }
 
+    const { lesson: { engButtons, engText, engForCheck, eng } } = user;
+    const [ word, prefix, idxWord ] = data.split('|');
     const lessonId = user.lesson.id;
-    const sentencesInLesson = this.getSentencesInLesson(lessonId);
+    const sentencesInLesson = this.getSentencesInLesson(lessonId, prefix);
     const paging = this.formatPaging(
       user.lesson.sentenceId - 1,
       user.lesson.id,
+      prefix,
     );
 
     if (word === CONTINUE) {
-      const sentenceNum = user.lesson.sentenceId - 1;
-      await this.deleteLastKeyboard(chatId);
-      this.showNextSentence(chatId, sentenceNum + 1, user.lesson.id);
+      this.onPressContinueButton(chatId, prefix);
     } else if (word === SHOW_ANSWER) {
       let text =
         `${paging}` +
@@ -582,7 +600,7 @@ export class Bot {
         user.getEngString() +
         '</b>';
 
-      const answerKeyboard = this.makeAnswerKeyboard(chatId);
+      const answerKeyboard = this.makeAnswerKeyboard(chatId, prefix);
       this.editMessageText(query, text, answerKeyboard);
     } else if (word === DELETE) {
       if (engText.length) {
@@ -601,11 +619,11 @@ export class Bot {
         user.getEngTextString() +
         '</b>';
 
-      const answerKeyboard = this.makeAnswerKeyboard(chatId);
+      const answerKeyboard = this.makeAnswerKeyboard(chatId, prefix);
       this.editMessageText(query, text, answerKeyboard);
     } else {
       if (engButtons.length) {
-        user.lesson.engText.push(engButtons[idxToRemove]);
+        user.lesson.engText.push(engButtons[Number(idxWord)]);
       }
 
       let text =
@@ -629,21 +647,48 @@ export class Bot {
         }
       }
 
-      const answerKeyboard = this.makeAnswerKeyboard(chatId);
-      this.editMessageText(query, text, answerKeyboard);
+      const answerKeyboard = this.makeAnswerKeyboard(chatId, prefix);
+      const result = await this.editMessageText(query, text, answerKeyboard);
+
+      if (result && engForCheck === user.getEngTextString()) {
+        this.onPressContinueButton(chatId, prefix);
+      }
     }
   };
 
+  showCommandsHelpMessage(chatId: number) {
+    this.sendMessage(
+      chatId,
+      `<b>${AVAILABLE_COMMANDS}:</b>` +
+        '\n/k - список уроков' +
+        '\n/kN - переход к уроку номер "N"' +
+        '\n/kN_M - переход к уроку номер "N", предложение номер "M"' +
+        '\n/p - список тем' +
+        '\n/pN - тема номер "N"' +
+        '\n/pN_M - тема номер "N", пример номер "M"',
+    );
+  }
+
   onMessage = (msg: Message) => {
     log('onMessage', msg);
+
+    // const { chat: { id: chatId }, text } = msg;
+
+    // this.sendMessage(chatId, COMMAND_NOT_FOUND);
+    // this.showCommandsHelpMessage(chatId);
   };
 
   run() {
-    this.bot.onText(/\/start/, this.onStart);
-    this.bot.onText(/\/kespa/, this.onShowContents);
-    this.bot.onText(/\/pairs/, this.onShowPairs);
-    this.bot.onText(/^\/\d+$/, this.onStartLesson);
-    this.bot.onText(/^\/\d+_\d+$/, this.onStartLessonFromNumber);
+    this.bot.onText(/\/start$/, this.onStart);
+    this.bot.onText(/\/k$/, this.onShowContents);
+    this.bot.onText(/\/p$/, this.onShowPairs);
+    // this.bot.onText(
+    //   `/^\/(${PREFIX_KESPA}|${PREFIX_PAIRS})\d+$/`,
+    //   // () => {},
+    //   this.onStartLesson,
+    // );
+    this.bot.onText(/^\/(k|p)\d+$/, this.onStartLesson);
+    this.bot.onText(/^\/k\d+_\d+$/, this.onStartLessonFromNumber);
     this.bot.on('message', this.onMessage);
     this.bot.on('callback_query', this.onCallbackQuery);
   }

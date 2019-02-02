@@ -1,5 +1,10 @@
 // @flow
 
+export type Collection = {
+  total: number,
+  data: Array<Object>,
+};
+
 type From = {
   id: number,
   is_bot: boolean,

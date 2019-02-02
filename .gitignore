@@ -1,5 +1,5 @@
 .env
 node_modules/
 .history/
-src/test/*.json
+src/test/
 todo

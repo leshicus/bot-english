@@ -3,7 +3,9 @@ import { MongoClient, ObjectId } from 'mongodb';
 import { promisify } from 'util';
 import fs from 'fs';
 import { log, processRussianSentence, divideSentenceByDot } from './utils';
-import { type LessonBasic, type Lesson } from './types';
+import { type LessonBasic, type Lesson, type Collection } from './types';
+import { PREFIX_KESPA, PREFIX_PAIRS } from './constants';
+
 import { config } from 'dotenv';
 config();
 
@@ -15,6 +17,7 @@ const DB = 'bot';
 const COLLECTION_LESSONS = 'lessons_1';
 const COLLECTION_LESSONS_LIST = 'lessonsList';
 const COLLECTION_PAIRS = 'pairs';
+const COLLECTION_PAIR_TOPICS = 'pairTopics';
 
 const DEBUG_MONGO = process.env.DEBUG_MONGO;
 
@@ -31,19 +34,69 @@ if (!MONGODB_PASSWORD) {
 const MONGO_URL = `mongodb+srv://alex:${MONGODB_PASSWORD}@${MONGODB_HOST}/${DB}?retryWrites=true`;
 
 export class Mongo {
-  lessons: Array<Object> = [];
-  lessonsList: Array<Object> = [];
-  pairs: Array<Object> = [];
+  lessons: Collection = {
+    total: 0,
+    data: [],
+  };
+  lessonsList: Collection = {
+    total: 0,
+    data: [],
+  };
+  pairs: Collection = {
+    total: 0,
+    data: [],
+  };
+  pairTopics: Collection = {
+    total: 0,
+    data: [],
+  };
 
   constructor() {
     try {
       this.loadLessons();
       this.loadLessonsList();
       this.loadPairs();
+      this.loadPairTopics();
+
+      // this.runSideEffects();
     } catch (error) {
       log(error);
     }
   }
+
+  loadLessons = () => {
+    return this.loadCollection(
+      COLLECTION_LESSONS,
+      this.lessons,
+      require('./test/lessons.json'),
+      { lesson: 1 },
+    );
+  };
+
+  loadLessonsList = () => {
+    return this.loadCollection(
+      COLLECTION_LESSONS_LIST,
+      this.lessonsList,
+      require('./test/lessonsList.json'),
+    );
+  };
+
+  loadPairs = () => {
+    return this.loadCollection(
+      COLLECTION_PAIRS,
+      this.pairs,
+      require('./test/pairs.json'),
+      { topicId: 1 },
+    );
+  };
+
+  loadPairTopics = () => {
+    return this.loadCollection(
+      COLLECTION_PAIR_TOPICS,
+      this.pairTopics,
+      require('./test/pairTopics.json'),
+    );
+  };
 
   async getClient() {
     try {
@@ -55,14 +108,21 @@ export class Mongo {
     }
   }
 
-  async getCollection(collectionName: string) {
+  async getCollection(collectionName: string, sortCondition?: Object) {
     log('getCollection', collectionName);
 
     try {
       const client = await this.getClient();
       if (client) {
         const connector = await client.db().collection(collectionName);
-        const collection = await connector.find({}).toArray();
+        let collection = null;
+
+        if (sortCondition) {
+          collection = await connector.find({}).sort(sortCondition).toArray();
+        } else {
+          collection = await connector.find({}).toArray();
+        }
+
         client.close();
 
         return await collection;
@@ -75,40 +135,40 @@ export class Mongo {
     }
   }
 
-  async loadLessons() {
-    log('loadLessons');
-
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        this.lessons = [
-          ...require('./test/1.json'),
-          ...require('./test/2.json'),
-          ...require('./test/3.json'),
-        ];
-      } else {
-        this.lessons = await this.getCollection(COLLECTION_LESSONS);
-
-        this.runSideEffects(this.lessons);
-      }
-    } catch (error) {
-      log(error);
-    }
-
-    log('Загружено уроков: ', this.lessons ? this.lessons.length : 0);
-
-    return this.lessons;
-  }
-
-  runSideEffects(lessons: Array<LessonBasic>) {
+  runSideEffects() {
     //this.copyRussian('lessons_1547657622954', 'rus_3');
     // for (let i = 0; i < 20; i++) {
     //   const newRus = processRussianSentence(lessons[i].rus);
     //   console.log(newRus);
     // }
     // this.processRussianSentence(lessons, 'lessons_final');
-    // this.copyCollection('lessons_final', 'lessons_1');
+    // this.copyCollection('lessons_1', 'lessons_2');
     // this.makeNewLessonsTable(lessons, 'lessons_devided');
     // this.deleteCollection('lessons_devided');
+    // this.updateLessons();
+  }
+
+  async updateLessons() {
+    const newLessonId = 55;
+    const startId = 1448;
+    const endId = 1457;
+
+    try {
+      const client = await this.getClient();
+      if (client) {
+        const { matchedCount } = await client
+          .db()
+          .collection('lessons_1')
+          .updateMany(
+            { old_id: { $gte: startId, $lte: endId } },
+            { $set: { lesson: newLessonId } },
+          );
+        console.log('matchedCount', matchedCount);
+        client.close();
+      }
+    } catch (error) {
+      log(error);
+    }
   }
 
   async processRussianSentence(
@@ -188,55 +248,58 @@ export class Mongo {
     })();
   }
 
-  async loadLessonsList() {
-    log('loadLessonsList');
+  async loadCollection(
+    collectionName: string,
+    target: Collection,
+    data: Array<Object>,
+    sortCondition?: Object,
+  ) {
+    log('loadCollection', collectionName);
 
     try {
+      console.log('DEBUG_MONGO2', DEBUG_MONGO);
       if (process.env.NODE_ENV === 'development') {
-        this.lessonsList = require('./test/lessonsList.json');
+        target.data = data;
       } else {
-        this.lessonsList = await this.getCollection(COLLECTION_LESSONS_LIST);
+        if (sortCondition) {
+          target.data = await this.getCollection(collectionName, sortCondition);
+        } else {
+          target.data = await this.getCollection(collectionName);
+        }
       }
+
+      target.total = await target.data.length;
     } catch (error) {
       log(error);
     }
 
-    log(
-      'Загружено тем уроков: ',
-      this.lessonsList ? this.lessonsList.length : 0,
-    );
+    log('Загружено', collectionName, target.total);
 
-    return this.lessonsList;
+    return target;
   }
 
-  async loadPairs() {
-    log('loadPairs');
-
-    try {
-      if (process.env.NODE_ENV === 'development') {
-        this.pairs = require('./test/pairs.json');
-      } else {
-        this.pairs = await this.getCollection(COLLECTION_PAIRS);
-      }
-    } catch (error) {
-      log(error);
-    }
-
-    log('Загружено пар: ', this.pairs ? this.pairs.length : 0);
-
-    return this.pairs;
-  }
-
-  getNumberOfLessons = () => {
-    // return this.lessons[this.lessons.length - 1].lesson;
-
+  getAmountOfTopics = (prefix: string) => {
     let prevIdx;
-    return this.lessons.reduce((acc, item) => {
-      if (!prevIdx || item.lesson !== prevIdx) {
-        prevIdx = item.lesson;
-        return Number(acc) + 1;
-      } else return acc;
-    }, 0);
+
+    if (prefix === PREFIX_KESPA) {
+      return this.lessons.data.reduce((acc, item) => {
+        if (!prevIdx || item.lesson !== prevIdx) {
+          prevIdx = item.lesson;
+          return Number(acc) + 1;
+        } else return acc;
+      }, 0);
+    }
+
+    if (prefix === PREFIX_PAIRS) {
+      return this.pairs.data.reduce((acc, item) => {
+        if (!prevIdx || item.topicId !== prevIdx) {
+          prevIdx = item.topicId;
+          return Number(acc) + 1;
+        } else return acc;
+      }, 0);
+    }
+
+    return 0;
   };
 
   async copyCollection(collectionName: string, newName: string) {
@@ -248,7 +311,7 @@ export class Mongo {
         const dataset = await connector.find({}).toArray();
 
         const newDataset = dataset.map(doc => ({
-          old_id: doc.id,
+          old_id: doc.old_id,
           eng: doc.eng,
           rus: doc.rus,
           lesson: doc.lesson,
@@ -289,7 +352,7 @@ export class Mongo {
     try {
       const client = await this.getClient();
       if (client) {
-        this.lessons.forEach(async lesson => {
+        this.lessons.data.forEach(async lesson => {
           const rus = lesson.rus;
           const id = lesson.id;
           const res = await client
