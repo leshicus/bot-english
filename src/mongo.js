@@ -62,37 +62,43 @@ export class Mongo {
   }
 
   loadLessons = () => {
-    return this.loadCollection(
-      COLLECTION_LESSONS,
-      this.lessons,
-      require('./test/lessons.json'),
-      { lesson: 1 },
-    );
+    let data = null;
+    if (process.env.NODE_ENV === 'development') {
+      data = require('./test/lessons.json');
+    }
+
+    return this.loadCollection(COLLECTION_LESSONS, this.lessons, data, {
+      lesson: 1,
+    });
   };
 
   loadLessonsList = () => {
-    return this.loadCollection(
-      COLLECTION_LESSONS_LIST,
-      this.lessonsList,
-      require('./test/lessonsList.json'),
-    );
+    let data = null;
+    if (process.env.NODE_ENV === 'development') {
+      data = require('./test/lessonsList.json');
+    }
+
+    return this.loadCollection(COLLECTION_LESSONS_LIST, this.lessonsList, data);
   };
 
   loadPairs = () => {
-    return this.loadCollection(
-      COLLECTION_PAIRS,
-      this.pairs,
-      require('./test/pairs.json'),
-      { topicId: 1 },
-    );
+    let data = null;
+    if (process.env.NODE_ENV === 'development') {
+      data = require('./test/pairs.json');
+    }
+
+    return this.loadCollection(COLLECTION_PAIRS, this.pairs, data, {
+      topicId: 1,
+    });
   };
 
   loadPairTopics = () => {
-    return this.loadCollection(
-      COLLECTION_PAIR_TOPICS,
-      this.pairTopics,
-      require('./test/pairTopics.json'),
-    );
+    let data = null;
+    if (process.env.NODE_ENV === 'development') {
+      data = require('./test/pairTopics.json');
+    }
+
+    return this.loadCollection(COLLECTION_PAIR_TOPICS, this.pairTopics, data);
   };
 
   async getClient() {
@@ -248,13 +254,13 @@ export class Mongo {
   async loadCollection(
     collectionName: string,
     target: Collection,
-    data: Array<Object>,
+    data?: Array<Object>,
     sortCondition?: Object,
   ) {
     log('loadCollection', collectionName);
 
     try {
-      if (process.env.NODE_ENV === 'development') {
+      if (data) {
         target.data = data;
       } else {
         if (sortCondition) {
