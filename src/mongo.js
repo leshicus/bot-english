@@ -1,6 +1,5 @@
 // @flow
 import { MongoClient, ObjectId } from 'mongodb';
-import { promisify } from 'util';
 import fs from 'fs';
 import { log, processRussianSentence, divideSentenceByDot } from './utils';
 import { type LessonBasic, type Lesson, type Collection } from './types';
@@ -8,8 +7,6 @@ import { PREFIX_KESPA, PREFIX_PAIRS } from './constants';
 
 import { config } from 'dotenv';
 config();
-
-const readFile = promisify(fs.readFile);
 
 const MONGODB_PASSWORD = process.env.MONGODB_PASSWORD || '';
 const MONGODB_HOST = process.env.MONGODB_HOST || '';
@@ -257,7 +254,6 @@ export class Mongo {
     log('loadCollection', collectionName);
 
     try {
-      console.log('DEBUG_MONGO2', DEBUG_MONGO);
       if (process.env.NODE_ENV === 'development') {
         target.data = data;
       } else {
