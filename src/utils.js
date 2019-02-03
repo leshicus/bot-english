@@ -87,3 +87,8 @@ export const sortByLength = (arr: Array<string>): Array<string> => {
     else return 0;
   });
 };
+
+export const truncate = (str, len) => {
+  if (str.length > len) return str.substr(0, len) + '...';
+  else return str;
+};

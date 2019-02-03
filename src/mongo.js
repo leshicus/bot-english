@@ -138,6 +138,82 @@ export class Mongo {
     }
   }
 
+  async loadCollection(
+    collectionName: string,
+    target: Collection,
+    data: ?Array<Object>,
+    sortCondition?: Object,
+  ) {
+    log('loadCollection', collectionName);
+
+    try {
+      if (data) {
+        target.data = data;
+      } else {
+        if (sortCondition) {
+          target.data = await this.getCollection(collectionName, sortCondition);
+        } else {
+          target.data = await this.getCollection(collectionName);
+        }
+      }
+
+      target.total = await target.data.length;
+    } catch (error) {
+      log(error);
+    }
+
+    log('Загружено', collectionName, target.total);
+
+    return target;
+  }
+
+  getTopicName = (lessonId: number, prefix: string) => {
+    if (prefix === PREFIX_KESPA) {
+      let lessons = this.lessonsList.data.map(item => item.lessons);
+      lessons = [].concat.apply([], lessons);
+
+      const lesson = lessons.find(item => item.id === String(lessonId));
+
+      if (lesson) return lesson.title;
+      else return '';
+    }
+
+    if (prefix === PREFIX_PAIRS) {
+      const topic = this.pairTopics.data.find(
+        item => item.id === String(lessonId),
+      );
+
+      if (topic) return topic.name;
+      else return '';
+    }
+    return '';
+  };
+
+  getAmountOfTopics = (prefix: string) => {
+    let prevIdx;
+
+    if (prefix === PREFIX_KESPA) {
+      return this.lessons.data.reduce((acc, item) => {
+        if (!prevIdx || item.lesson !== prevIdx) {
+          prevIdx = item.lesson;
+          return Number(acc) + 1;
+        } else return acc;
+      }, 0);
+    }
+
+    if (prefix === PREFIX_PAIRS) {
+      return this.pairs.data.reduce((acc, item) => {
+        if (!prevIdx || item.topicId !== prevIdx) {
+          prevIdx = item.topicId;
+          return Number(acc) + 1;
+        } else return acc;
+      }, 0);
+    }
+
+    return 0;
+  };
+
+  //! Side effects
   runSideEffects() {
     //this.copyRussian('lessons_1547657622954', 'rus_3');
     // for (let i = 0; i < 20; i++) {
@@ -145,10 +221,50 @@ export class Mongo {
     //   console.log(newRus);
     // }
     // this.processRussianSentence(lessons, 'lessons_final');
-    // this.copyCollection('lessons_1', 'lessons_2');
+    // this.copyCollection('pairs', 'pairs_temp');
     // this.makeNewLessonsTable(lessons, 'lessons_devided');
     // this.deleteCollection('lessons_devided');
     // this.updateLessons();
+    // this.reverseFields('pairs', 'eng', 'rus', 53);
+  }
+
+  async withClient(foo: (client: any) => Promise<Object>) {
+    try {
+      const client = await this.getClient();
+      if (client) {
+        const res = await foo(client);
+
+        if (res) console.log('matchedCount', res.matchedCount);
+        else console.log('res', res);
+
+        client.close();
+      }
+    } catch (error) {
+      log(error);
+    }
+  }
+
+  reverseFields(
+    colName: string,
+    field1: string,
+    field2: string,
+    topicId: number,
+  ) {
+    this.withClient(async client => {
+      return client
+        .db()
+        .collection(colName)
+        .find({ topicId })
+        .forEach(element => {
+          client
+            .db()
+            .collection(colName)
+            .updateOne(
+              { _id: element._id },
+              { $set: { rus: element.eng, eng: element.rus } },
+            );
+        });
+    });
   }
 
   async updateLessons() {
@@ -251,87 +367,15 @@ export class Mongo {
     })();
   }
 
-  async loadCollection(
-    collectionName: string,
-    target: Collection,
-    data?: Array<Object>,
-    sortCondition?: Object,
-  ) {
-    log('loadCollection', collectionName);
-
-    try {
-      if (data) {
-        target.data = data;
-      } else {
-        if (sortCondition) {
-          target.data = await this.getCollection(collectionName, sortCondition);
-        } else {
-          target.data = await this.getCollection(collectionName);
-        }
-      }
-
-      target.total = await target.data.length;
-    } catch (error) {
-      log(error);
-    }
-
-    log('Загружено', collectionName, target.total);
-
-    return target;
-  }
-
-  getAmountOfTopics = (prefix: string) => {
-    let prevIdx;
-
-    if (prefix === PREFIX_KESPA) {
-      return this.lessons.data.reduce((acc, item) => {
-        if (!prevIdx || item.lesson !== prevIdx) {
-          prevIdx = item.lesson;
-          return Number(acc) + 1;
-        } else return acc;
-      }, 0);
-    }
-
-    if (prefix === PREFIX_PAIRS) {
-      return this.pairs.data.reduce((acc, item) => {
-        if (!prevIdx || item.topicId !== prevIdx) {
-          prevIdx = item.topicId;
-          return Number(acc) + 1;
-        } else return acc;
-      }, 0);
-    }
-
-    return 0;
-  };
-
-  async copyCollection(collectionName: string, newName: string) {
+  async copyCollection(colName: string, newName: string) {
     console.log('copyCollection newName', newName);
-    try {
-      const client = await this.getClient();
-      if (client) {
-        const connector = await client.db().collection(collectionName);
-        const dataset = await connector.find({}).toArray();
 
-        const newDataset = dataset.map(doc => ({
-          old_id: doc.old_id,
-          eng: doc.eng,
-          rus: doc.rus,
-          lesson: doc.lesson,
-          words: doc.words,
-        }));
-
-        const newConnector = await client.db().collection(newName);
-        const cnt = newConnector.insertMany(newDataset);
-
-        client.close();
-
-        return cnt;
-      }
-    } catch (error) {
-      log(error);
-    }
-
-    return 0;
+    this.withClient(async client => {
+      return client
+        .db()
+        .collection(newName)
+        .insertMany(await client.db().collection(colName).find({}).toArray());
+    });
   }
 
   async renameCollection(collectionName: string, newName: string) {

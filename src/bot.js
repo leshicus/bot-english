@@ -1,7 +1,13 @@
 // @flow
 import TelegramBot from 'node-telegram-bot-api';
 import { Mongo } from './mongo';
-import { sortByLength, log, shuffle, processRussianSentence } from './utils';
+import {
+  sortByLength,
+  log,
+  shuffle,
+  truncate,
+  processRussianSentence,
+} from './utils';
 import type { Query, Message } from './types';
 import { User } from './user';
 import {
@@ -338,8 +344,12 @@ export class Bot {
 
   formatPaging(sentenceNum: number, lessonId: number, prefix: string) {
     const sentencesInLesson = this.getSentencesInLesson(lessonId, prefix);
-    return `<i>Тема: ${lessonId}, урок: ${sentenceNum +
-      1} из ${sentencesInLesson.length}</i>`;
+    // return `<i>Тема: ${lessonId}, [${sentenceNum +
+    // 1} из ${sentencesInLesson.length}]</i>`;F
+    const topicName = truncate(this.mongo.getTopicName(lessonId, prefix), 20);
+
+    return `<i>Тема: ${lessonId} "${topicName}" [${sentenceNum +
+      1} из ${sentencesInLesson.length}]</i>`;
   }
 
   async showSentenceToUser(
