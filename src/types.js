@@ -1,5 +1,10 @@
 // @flow
 
+export type Context = {
+  eng: string,
+  rus: string,
+};
+
 export type Collection = {
   total: number,
   data: Array<Object>,

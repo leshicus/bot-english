@@ -88,7 +88,10 @@ export const sortByLength = (arr: Array<string>): Array<string> => {
   });
 };
 
-export const truncate = (str, len) => {
+export const truncate = (str: string, len: number) => {
   if (str.length > len) return str.substr(0, len) + '...';
   else return str;
 };
+
+export const getRandom = items =>
+  items[Math.floor(Math.random() * items.length)];

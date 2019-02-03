@@ -7,6 +7,7 @@ import {
   shuffle,
   truncate,
   processRussianSentence,
+  getRandom,
 } from './utils';
 import type { Query, Message } from './types';
 import { User } from './user';
@@ -16,6 +17,7 @@ import {
   type KeyboardRow,
   type Keyboard,
   type Markup,
+  type Context,
 } from './types';
 import {
   MSG_MAX_LEN,
@@ -35,7 +37,13 @@ import {
   CORRECT,
   WRONG,
   TG_MAX_LENGTH,
+  SHOW_CONTEXT,
+  CONTEXTO_URL,
+  CONTEXT_CNT,
+  POINTS,
 } from './constants';
+import axios from 'axios';
+import jsdom, { JSDOM } from 'jsdom';
 
 const DEBUG_MONGO = process.env.DEBUG_MONGO;
 
@@ -235,7 +243,6 @@ export class Bot {
 
     this.registerUser(msg);
 
-    // if (this.mongo.lessons && this.mongo.lessons.length) {
     const lessonsLength = this.getSentencesInLesson(lessonId, prefix).length;
 
     if (lessonsLength <= sentenceNum) {
@@ -243,7 +250,6 @@ export class Bot {
     }
 
     this.showNextSentence(chatId, sentenceNum, lessonId, prefix);
-    // }
   };
 
   getSentencesInLesson(lessonId: number, prefix: string): Array<Object> {
@@ -344,8 +350,6 @@ export class Bot {
 
   formatPaging(sentenceNum: number, lessonId: number, prefix: string) {
     const sentencesInLesson = this.getSentencesInLesson(lessonId, prefix);
-    // return `<i>Тема: ${lessonId}, [${sentenceNum +
-    // 1} из ${sentencesInLesson.length}]</i>`;F
     const topicName = truncate(this.mongo.getTopicName(lessonId, prefix), 20);
 
     return `<i>Тема: ${lessonId} "${topicName}" [${sentenceNum +
@@ -420,9 +424,15 @@ export class Bot {
 
     const answerButton = this.getActionButton(SHOW_ANSWER, prefix);
     const deleteButton = this.getActionButton(DELETE, prefix);
+    const showContextButton = this.getActionButton(SHOW_CONTEXT, prefix);
     const continueButton = this.getActionButton(CONTINUE, prefix);
 
-    answerKeyboard.push([ answerButton, deleteButton, continueButton ]);
+    answerKeyboard.push([
+      showContextButton,
+      answerButton,
+      deleteButton,
+      continueButton,
+    ]);
 
     return answerKeyboard;
   }
@@ -562,6 +572,53 @@ export class Bot {
     this.showNextSentence(chatId, nextSentenceNum, user.lesson.id, prefix);
   }
 
+  showContextToUser(chatId: number, arr: Array<Context>) {
+    const text = arr.reduce((acc, item) => {
+      const point = getRandom(POINTS);
+      return acc + `${point} ${item.eng} - ${item.rus}\n`;
+    }, '');
+
+    this.sendMessage(chatId, text);
+  }
+
+  async requestContext(chatId: number, prefix: string, engText: string) {
+    console.log('showContext', engText);
+
+    const url = CONTEXTO_URL + engText.replace(/( )/g, '+');
+    console.log(url);
+
+    try {
+      const { data } = await axios.get(url);
+      if (data) {
+        const dom = new JSDOM(data);
+        const example = dom.window.document.querySelectorAll('.example');
+        const arr = [ ...example ].slice(0, CONTEXT_CNT).map(e => ({
+          eng: [
+            ...e.querySelectorAll('.src.ltr')[0].querySelectorAll('.text')[0]
+              .childNodes,
+          ]
+            .reduce((acc, nodeList) => {
+              if (nodeList.tagName === 'EM') {
+                return acc + ` <b>${nodeList.textContent}</b>`;
+              }
+
+              return acc + ` ${nodeList.textContent}`;
+            }, '')
+            .trim(),
+          rus: e
+            .querySelectorAll('.trg.ltr')[0]
+            .querySelectorAll('.text')[0]
+            .textContent.trim(),
+        }));
+        console.log(arr);
+
+        if (arr.length) this.showContextToUser(chatId, arr);
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
   onCallbackQuery = async (query: Query) => {
     log('onCallbackQuery');
 
@@ -593,6 +650,8 @@ export class Bot {
 
     if (word === CONTINUE) {
       this.onPressContinueButton(chatId, prefix);
+    } else if (word === SHOW_CONTEXT) {
+      this.requestContext(chatId, prefix, engForCheck);
     } else if (word === SHOW_ANSWER) {
       let text =
         `${paging}` +
@@ -675,7 +734,8 @@ export class Bot {
         '\n/kN_M - переход к уроку номер "N", предложение номер "M"' +
         '\n/p - список тем' +
         '\n/pN - тема номер "N"' +
-        '\n/pN_M - тема номер "N", пример номер "M"',
+        '\n/pN_M - тема номер "N", пример номер "M"' +
+        `\n${SHOW_CONTEXT} - Контекс, ${ANS} - Ответ, ${DELETE} - Удалить слово, ${CONTINUE} - Следующий пример`,
     );
   }
 
