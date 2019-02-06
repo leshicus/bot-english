@@ -6,6 +6,7 @@ export const TOPIC_IS_EMPTY = 'В теме нет уроков';
 export const COMMAND_NOT_FOUND = 'Команда не найдена';
 export const AVAILABLE_COMMANDS = 'Доступные команды';
 
+export const MAX_LENGTH_CONTEXT_ENG_SENT = 90; // максимальная длина предложения в примере контекста
 export const WORDS_IN_ROW = 4;
 export const CONTEXT_CNT = 3; // колличество примеров контекста
 

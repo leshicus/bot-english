@@ -43,6 +43,7 @@ import {
   POINTS,
   MORE_CONTEXT,
   BACK,
+  MAX_LENGTH_CONTEXT_ENG_SENT,
 } from './constants';
 import axios from 'axios';
 import jsdom, { JSDOM } from 'jsdom';
@@ -677,24 +678,26 @@ export class Bot {
       if (data) {
         const dom = new JSDOM(data);
         const example = dom.window.document.querySelectorAll('.example');
-        const arr = [ ...example ].map(e => ({
-          eng: [
-            ...e.querySelectorAll('.src.ltr')[0].querySelectorAll('.text')[0]
-              .childNodes,
-          ]
-            .reduce((acc, nodeList) => {
-              if (nodeList.tagName === 'EM') {
-                return acc + ` <b>${nodeList.textContent}</b>`;
-              }
+        const arr = [ ...example ]
+          .map(e => ({
+            eng: [
+              ...e.querySelectorAll('.src.ltr')[0].querySelectorAll('.text')[0]
+                .childNodes,
+            ]
+              .reduce((acc, nodeList) => {
+                if (nodeList.tagName === 'EM') {
+                  return acc + ` <b>${nodeList.textContent}</b>`;
+                }
 
-              return acc + ` ${nodeList.textContent}`;
-            }, '')
-            .trim(),
-          rus: e
-            .querySelectorAll('.trg.ltr')[0]
-            .querySelectorAll('.text')[0]
-            .textContent.trim(),
-        }));
+                return acc + ` ${nodeList.textContent}`;
+              }, '')
+              .trim(),
+            rus: e
+              .querySelectorAll('.trg.ltr')[0]
+              .querySelectorAll('.text')[0]
+              .textContent.trim(),
+          }))
+          .filter(item => item.eng.length < MAX_LENGTH_CONTEXT_ENG_SENT);
         console.log(arr);
 
         if (arr.length) {
