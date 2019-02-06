@@ -1,5 +1,5 @@
 //@flow
-import { type Word, type Lesson } from './types';
+import type { Word, Lesson, Context } from './types';
 
 export class User {
   id: number;
@@ -8,6 +8,7 @@ export class User {
   language_code: string | void;
   lesson: Lesson;
   lastMessageId: number | void;
+  context: Array<Context> = [];
 
   constructor(
     id: number,

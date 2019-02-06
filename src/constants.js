@@ -1,5 +1,5 @@
 export const MSG_MAX_LEN = 'Длина сообщения превышает максимально допустимую: ';
-export const PREFIX_KESPA = 'k';
+export const PREFIX_LESSONS = 'k';
 export const PREFIX_PAIRS = 'p';
 
 export const TOPIC_IS_EMPTY = 'В теме нет уроков';
@@ -9,23 +9,23 @@ export const AVAILABLE_COMMANDS = 'Доступные команды';
 export const WORDS_IN_ROW = 4;
 export const CONTEXT_CNT = 3; // колличество примеров контекста
 
-// ✅ ❌ ℹ️ ❓ ✂️ ⌫ ⇨ → 👁 ⬅️ 😀🤨😕🤔🖼📖💬
+// ✅ ❌ ℹ️ ❓ ✂️ ⌫ ⇨ → 👁 ⬅️ ➡️ 😀🤨😕🤔🖼📖💬 ◀️ ⏪ ⏩
 // export const CONTINUE = 'След.'; // '',
-export const CONTINUE = '➡️'; // '',
+export const BACK = '⬅️ Пред'; // '',
+export const CONTINUE = '➡️ След'; // '',
 // export const DELETE = 'Удалить'; // ''
-export const DELETE = '✂️'; // ''
+export const DELETE = '✂️ Удал'; // ''
 // export const SHOW_ANSWER = 'Ответ';
-export const SHOW_ANSWER = 'ℹ️';
+export const SHOW_ANSWER = 'ℹ️ Отв';
+export const SHOW_CONTEXT = '💬 Прим';
+export const MORE_CONTEXT = '💬 Еще примеры';
 export const EN = '🇬🇧';
 export const RU = '🇧🇬';
 export const ANS = 'ℹ️';
-export const TRANSLATE = '<i>Переведите на английский:</i>';
-// export const CORRECT = '✅';
+export const TRANSLATE = '<i>Переведите на английский</i> 🇧🇬 → 🇬🇧';
 export const CORRECT = '🍏';
-// export const WRONG = '❌';
 export const WRONG = '🍎';
 // export const SHOW_CONTEXT = 'Контекст';
-export const SHOW_CONTEXT = '💬';
 
 export const TG_MAX_LENGTH = 4096; // telegram msg max length
 

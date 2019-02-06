@@ -21,7 +21,7 @@ import {
 } from './types';
 import {
   MSG_MAX_LEN,
-  PREFIX_KESPA,
+  PREFIX_LESSONS,
   PREFIX_PAIRS,
   TOPIC_IS_EMPTY,
   COMMAND_NOT_FOUND,
@@ -41,6 +41,8 @@ import {
   CONTEXTO_URL,
   CONTEXT_CNT,
   POINTS,
+  MORE_CONTEXT,
+  BACK,
 } from './constants';
 import axios from 'axios';
 import jsdom, { JSDOM } from 'jsdom';
@@ -198,7 +200,7 @@ export class Bot {
 
         if (topic.lessons && topic.lessons.length) {
           acc += topic.lessons.reduce((ac, lesson) => {
-            const length = this.getSentencesInLesson(+lesson.id, PREFIX_KESPA)
+            const length = this.getSentencesInLesson(+lesson.id, PREFIX_LESSONS)
               .length;
 
             ac += `/k${lesson.id} ${lesson.title} (${length}) \n`;
@@ -254,7 +256,7 @@ export class Bot {
 
   getSentencesInLesson(lessonId: number, prefix: string): Array<Object> {
     log('getSentencesInLesson', lessonId, prefix);
-    if (prefix === PREFIX_KESPA) {
+    if (prefix === PREFIX_LESSONS) {
       // $FlowFixMe
       return this.mongo.lessons.data.filter(
         lesson => lesson.lesson === lessonId,
@@ -275,7 +277,7 @@ export class Bot {
   }
 
   checkLessonLoaded(prefix: string) {
-    if (prefix === PREFIX_KESPA) {
+    if (prefix === PREFIX_LESSONS) {
       return this.mongo.lessons.total;
     }
 
@@ -343,6 +345,7 @@ export class Bot {
         engText: [],
         words: words,
       };
+      this.users[chatId].context = [];
     }
 
     this.showSentenceToUser(chatId, sentenceNum, sentencesInLesson, prefix);
@@ -379,6 +382,7 @@ export class Bot {
       `\n${EN} `;
 
     const message_id = await this.sendMessage(chatId, text, inline_keyboard);
+
     if (message_id) {
       this.users[chatId].lastMessageId = message_id;
     }
@@ -426,21 +430,44 @@ export class Bot {
     const deleteButton = this.getActionButton(DELETE, prefix);
     const showContextButton = this.getActionButton(SHOW_CONTEXT, prefix);
     const continueButton = this.getActionButton(CONTINUE, prefix);
+    const backButton = this.getActionButton(BACK, prefix);
 
     answerKeyboard.push([
       showContextButton,
       answerButton,
       deleteButton,
+      backButton,
       continueButton,
     ]);
 
     return answerKeyboard;
   }
 
-  getActionButton(buttonName: string, prefix: string) {
+  makeContextKeyboard(
+    chatId: number,
+    prefix: string,
+    idxNext: number,
+    message_id: number,
+  ) {
+    log('makeContextKeyboard');
+
+    let answerKeyboard: Keyboard = [];
+    const moreContextButton = this.getActionButton(
+      MORE_CONTEXT,
+      prefix,
+      idxNext,
+    );
+    const continueButton = this.getActionButton(CONTINUE, prefix, message_id);
+
+    answerKeyboard.push([ moreContextButton, continueButton ]);
+
+    return answerKeyboard;
+  }
+
+  getActionButton(/* buttonName: string, prefix: string */ ...args) {
     return {
-      text: buttonName,
-      callback_data: `${buttonName}|${prefix}`,
+      text: args[0],
+      callback_data: args.join('|'),
     };
   }
 
@@ -518,12 +545,12 @@ export class Bot {
     }
   }
 
-  async deleteLastKeyboard(chatId: number) {
+  async deleteLastKeyboard(chatId: number, message_id?: number) {
     log('deleteLastKeyboard');
     const user = this.users[chatId];
 
     if (user) {
-      const lastMessageId = this.users[chatId].lastMessageId;
+      const lastMessageId = message_id || this.users[chatId].lastMessageId;
 
       if (lastMessageId) {
         try {
@@ -564,21 +591,79 @@ export class Bot {
     return `Error in *${where}*, ${JSON.stringify(params)}`;
   }
 
-  async onPressContinueButton(chatId: number, prefix: string) {
+  async onPressContinueButton(
+    chatId: number,
+    prefix: string,
+    message_id: number,
+  ) {
     const user = this.users[chatId];
     const nextSentenceNum = user.lesson.sentenceId;
 
-    await this.deleteLastKeyboard(chatId);
-    this.showNextSentence(chatId, nextSentenceNum, user.lesson.id, prefix);
+    this.deleteOldButtonsAndShowNext(
+      chatId,
+      prefix,
+      message_id,
+      nextSentenceNum,
+    );
   }
 
-  showContextToUser(chatId: number, arr: Array<Context>) {
-    const text = arr.reduce((acc, item) => {
-      const point = getRandom(POINTS);
-      return acc + `${point} ${item.eng} - ${item.rus}\n`;
-    }, '');
+  async onPressBackButton(chatId: number, prefix: string, message_id: number) {
+    const user = this.users[chatId];
 
-    this.sendMessage(chatId, text);
+    if (user.lesson.sentenceId - 2 >= 0) {
+      this.deleteOldButtonsAndShowNext(
+        chatId,
+        prefix,
+        message_id,
+        user.lesson.sentenceId - 2,
+      );
+    }
+  }
+
+  deleteOldButtonsAndShowNext = async (
+    chatId: number,
+    prefix: string,
+    message_id: number,
+    nextSentenceNum: number,
+  ) => {
+    console.log('deleteOldButtonsAndShowNext', nextSentenceNum);
+    const user = this.users[chatId];
+    await this.deleteLastKeyboard(chatId);
+    await this.deleteLastKeyboard(chatId, message_id);
+
+    this.showNextSentence(chatId, nextSentenceNum, user.lesson.id, prefix);
+  };
+
+  showContextToUser(
+    chatId: number,
+    prefix: string,
+    idxFrom: number,
+    message_id?: number,
+  ) {
+    console.log('showContextToUser', message_id);
+    const user = this.users[chatId];
+    const context = user.context;
+    const point = getRandom(POINTS);
+
+    const text = context
+      .slice(idxFrom, idxFrom + CONTEXT_CNT)
+      .reduce((acc, item) => {
+        return acc + `${point} ${item.eng} - ${item.rus}\n`;
+      }, '');
+
+    let inline_keyboard = [];
+    if (idxFrom < this.users[chatId].context.length) {
+      inline_keyboard = this.makeContextKeyboard(
+        chatId,
+        prefix,
+        idxFrom + CONTEXT_CNT,
+      );
+    }
+
+    console.log(inline_keyboard);
+
+    if (text) this.sendMessage(chatId, text, inline_keyboard);
+    if (message_id) this.deleteLastKeyboard(chatId, message_id);
   }
 
   async requestContext(chatId: number, prefix: string, engText: string) {
@@ -592,7 +677,7 @@ export class Bot {
       if (data) {
         const dom = new JSDOM(data);
         const example = dom.window.document.querySelectorAll('.example');
-        const arr = [ ...example ].slice(0, CONTEXT_CNT).map(e => ({
+        const arr = [ ...example ].map(e => ({
           eng: [
             ...e.querySelectorAll('.src.ltr')[0].querySelectorAll('.text')[0]
               .childNodes,
@@ -612,7 +697,10 @@ export class Bot {
         }));
         console.log(arr);
 
-        if (arr.length) this.showContextToUser(chatId, arr);
+        if (arr.length) {
+          this.users[chatId].context = arr;
+          this.showContextToUser(chatId, prefix, 0);
+        }
       }
     } catch (e) {
       console.log(e);
@@ -649,9 +737,13 @@ export class Bot {
     );
 
     if (word === CONTINUE) {
-      this.onPressContinueButton(chatId, prefix);
+      this.onPressContinueButton(chatId, prefix, message_id);
+    } else if (word === BACK) {
+      this.onPressBackButton(chatId, prefix, message_id);
     } else if (word === SHOW_CONTEXT) {
       this.requestContext(chatId, prefix, engForCheck);
+    } else if (word === MORE_CONTEXT) {
+      this.showContextToUser(chatId, prefix, Number(idxWord), message_id); // idxWord - здесь это номер след. предложения из массива контекста
     } else if (word === SHOW_ANSWER) {
       let text =
         `${paging}` +
@@ -753,7 +845,7 @@ export class Bot {
     this.bot.onText(/\/k$/, this.onShowContents);
     this.bot.onText(/\/p$/, this.onShowPairs);
     // this.bot.onText(
-    //   `/^\/(${PREFIX_KESPA}|${PREFIX_PAIRS})\d+$/`,
+    //   `/^\/(${PREFIX_LESSONS}|${PREFIX_PAIRS})\d+$/`,
     //   // () => {},
     //   this.onStartLesson,
     // );

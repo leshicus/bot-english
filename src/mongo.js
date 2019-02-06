@@ -3,7 +3,7 @@ import { MongoClient, ObjectId } from 'mongodb';
 import fs from 'fs';
 import { log, processRussianSentence, divideSentenceByDot } from './utils';
 import { type LessonBasic, type Lesson, type Collection } from './types';
-import { PREFIX_KESPA, PREFIX_PAIRS } from './constants';
+import { PREFIX_LESSONS, PREFIX_PAIRS } from './constants';
 
 import { config } from 'dotenv';
 config();
@@ -78,7 +78,12 @@ export class Mongo {
       data = require('./test/lessonsList.json');
     }
 
-    return this.loadCollection(COLLECTION_LESSONS_LIST, this.lessonsList, data);
+    return this.loadCollection(
+      COLLECTION_LESSONS_LIST,
+      this.lessonsList,
+      data,
+      { id: 1 },
+    );
   };
 
   loadPairs = () => {
@@ -98,7 +103,9 @@ export class Mongo {
       data = require('./test/pairTopics.json');
     }
 
-    return this.loadCollection(COLLECTION_PAIR_TOPICS, this.pairTopics, data);
+    return this.loadCollection(COLLECTION_PAIR_TOPICS, this.pairTopics, data, {
+      id: 1,
+    });
   };
 
   async getClient() {
@@ -168,7 +175,7 @@ export class Mongo {
   }
 
   getTopicName = (lessonId: number, prefix: string) => {
-    if (prefix === PREFIX_KESPA) {
+    if (prefix === PREFIX_LESSONS) {
       let lessons = this.lessonsList.data.map(item => item.lessons);
       lessons = [].concat.apply([], lessons);
 
@@ -192,7 +199,7 @@ export class Mongo {
   getAmountOfTopics = (prefix: string) => {
     let prevIdx;
 
-    if (prefix === PREFIX_KESPA) {
+    if (prefix === PREFIX_LESSONS) {
       return this.lessons.data.reduce((acc, item) => {
         if (!prevIdx || item.lesson !== prevIdx) {
           prevIdx = item.lesson;
